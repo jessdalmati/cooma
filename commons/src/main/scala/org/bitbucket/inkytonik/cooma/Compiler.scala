@@ -109,8 +109,8 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("l")),
                 Vector(
-                    Case("False", IdnDef("_"), False()),
-                    Case("True", IdnDef("_"), Idn(IdnUse("r")))
+                    Case(Pattern("False", IdnDef("_")), False()),
+                    Case(Pattern("True", IdnDef("_")), Idn(IdnUse("r")))
                 )
             )
         )
@@ -123,8 +123,8 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("b")),
                 Vector(
-                    Case("False", IdnDef("_"), True()),
-                    Case("True", IdnDef("_"), False())
+                    Case(Pattern("False", IdnDef("_")), True()),
+                    Case(Pattern("True", IdnDef("_")), False())
                 )
             )
         )
@@ -138,8 +138,8 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("l")),
                 Vector(
-                    Case("False", IdnDef("_"), Idn(IdnUse("r"))),
-                    Case("True", IdnDef("_"), True())
+                    Case(Pattern("False", IdnDef("_")), Idn(IdnUse("r"))),
+                    Case(Pattern("True", IdnDef("_")), True())
                 )
             )
         )
@@ -373,12 +373,20 @@ trait Compiler {
 
     def compileMatch(e : Expression, cs : Vector[Case], kappa : String => Term) : Term = {
         val cks = cs.map(c => (c, fresh("k")))
-        val caseTerms = cks.map { case (c, k) => caseTerm(c.identifier, k) }
+
+        val caseTerms = cks.map {
+            case (c, k) => caseTerm(c.pattern match {
+                case Pattern(identifier, _) => identifier
+            }, k)
+        }
+
         compile(e, z =>
             cks.foldLeft(casV(z, caseTerms)) {
-                case (t, (Case(_, IdnDef(xi), ei), ki)) =>
-                    letC(ki, xi, compile(ei, zi => kappa(zi)),
-                        t)
+                case (t, (Case(pattern, ei), ki)) =>
+                    pattern match {
+                        case Pattern(_, IdnDef(xi)) =>
+                            letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                    }
             })
     }
 
@@ -545,10 +553,14 @@ trait Compiler {
 
     def tailCompileMatch(e : Expression, cs : Vector[Case], k : String) : Term = {
         val cks = cs.map(c => (c, fresh("k")))
-        val caseTerms = cks.map { case (c, k) => caseTerm(c.identifier, k) }
+        val caseTerms = cks.map {
+            case (c, k) => caseTerm(c.pattern match {
+                case Pattern(identifier, _) => identifier
+            }, k)
+        }
         compile(e, z =>
             cks.foldLeft(casV(z, caseTerms)) {
-                case (t, (Case(vi, IdnDef(xi), ei), ki)) =>
+                case (t, (Case(Pattern(vi, IdnDef(xi)), ei), ki)) =>
                     letC(ki, xi, tailCompile(ei, k),
                         t)
             })

@@ -55,7 +55,10 @@ ArgumentType =
   (IdnDef sp ":")? Expression.
 
 Case =
-  \n "case" Identifier '(' IdnDef ")" '=>' nestnl(Expression).
+  \n "case" Pattern '=>' nestnl(Expression).
+
+Pattern = 
+    Identifier '(' IdnDef ")".
 
 Field =
   \n Identifier sp "=" Expression.
