@@ -126,7 +126,8 @@ class SemanticAnalyser(
         if (isDuplicateCase(c, m))
             error(c, s"duplicate case for variant ${
                 c.pattern match {
-                    case Pattern(identifier, _) => identifier
+                    case VPtrn(identifier, _) => identifier
+                    case DPtrn(idnDef)        => idnDef.identifier
                 }
             }")
         else
@@ -144,12 +145,14 @@ class SemanticAnalyser(
         tipe(m.expression) match {
             case Some(t @ VarT(fieldTypes)) =>
                 fieldTypes.find(f => f.identifier == (c.pattern match {
-                    case Pattern(identifier, _) => identifier
+                    case VPtrn(identifier, _) => identifier
+                    case DPtrn(idnDef)        => idnDef.identifier
                 })) match {
                     case None =>
                         error(c, s"variant ${
                             c.pattern match {
-                                case Pattern(identifier, _) => identifier
+                                case VPtrn(identifier, _) => identifier
+                                case DPtrn(idnDef)        => idnDef.identifier
                             }
                         } not present in matched type ${show(alias(t))}")
                     case _ =>
@@ -284,7 +287,10 @@ class SemanticAnalyser(
         // case tree.parent.pair(n @ IdnDef(i), c : Case) if !isWildcard(i) =>
         //     defineIfNew(out(n), i, MultipleEntity(), CaseValueEntity(c))
 
-        case tree.parent.pair(n @ Pattern(_, IdnDef(i)), c : Case) if !isWildcard(i) =>
+        case tree.parent.pair(n @ VPtrn(_, IdnDef(i)), c : Case) if !isWildcard(i) =>
+            defineIfNew(out(n), i, MultipleEntity(), CaseValueEntity(c))
+
+        case tree.parent.pair(n @ DPtrn(IdnDef(i)), c : Case) if !isWildcard(i) =>
             defineIfNew(out(n), i, MultipleEntity(), CaseValueEntity(c))
 
         case tree.parent.pair(n @ IdnDef(i), d : Def) if !isWildcard(i) =>
@@ -321,9 +327,11 @@ class SemanticAnalyser(
 
     def isDuplicateCase(c : Case, m : Mat) =
         m.cases.map(_.pattern match {
-            case Pattern(identifier, _) => identifier
+            case VPtrn(identifier, _) => identifier
+            case DPtrn(idnDef)        => idnDef.identifier
         }).count(_ == (c.pattern match {
-            case Pattern(identifier, _) => identifier
+            case VPtrn(identifier, _) => identifier
+            case DPtrn(idnDef)        => idnDef.identifier
         })) > 1
 
     lazy val fieldNames : Rec => Vector[String] =
