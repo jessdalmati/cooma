@@ -100,8 +100,9 @@ class Interpreter(config : Config) {
                         case VarR(c1, v) =>
                             val optK =
                                 cs.collectFirst {
-                                    case CaseTerm(c2, k) if c1 == c2 =>
+                                    case VCaseTerm(c2, k) if c1 == c2 =>
                                         k
+                                    case DCaseTerm(k) => k
                                 }
                             optK match {
                                 case Some(k) =>

@@ -375,10 +375,10 @@ trait Compiler {
         val cks = cs.map(c => (c, fresh("k")))
 
         val caseTerms = cks.map {
-            case (c, k) => caseTerm(c.pattern match {
-                case VPtrn(identifier, _) => identifier
-                case DPtrn(idnDef)        => idnDef.identifier
-            }, k)
+            case (c, k) => c.pattern match {
+                case VPtrn(identifier, _) => vCaseTerm(identifier, k)
+                case DPtrn(_)             => dCaseTerm(k)
+            }
         }
 
         compile(e, z =>
@@ -557,10 +557,10 @@ trait Compiler {
     def tailCompileMatch(e : Expression, cs : Vector[Case], k : String) : Term = {
         val cks = cs.map(c => (c, fresh("k")))
         val caseTerms = cks.map {
-            case (c, k) => caseTerm(c.pattern match {
-                case VPtrn(identifier, _) => identifier
-                case DPtrn(idnDef)        => idnDef.identifier
-            }, k)
+            case (c, k) => c.pattern match {
+                case VPtrn(identifier, _) => vCaseTerm(identifier, k)
+                case DPtrn(_)             => dCaseTerm(k)
+            }
         }
 
         compile(e, z =>

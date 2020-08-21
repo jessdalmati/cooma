@@ -5,6 +5,8 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.bitbucket.inkytonik.cooma.truffle.exceptions.CoomaException;
 import org.bitbucket.inkytonik.cooma.truffle.nodes.environment.Rho;
 import org.bitbucket.inkytonik.cooma.truffle.nodes.value.CoomaCaseTerm;
+import org.bitbucket.inkytonik.cooma.truffle.nodes.value.CoomaVariantCaseTerm;
+import org.bitbucket.inkytonik.cooma.truffle.nodes.value.CoomaDefaultCaseTerm;
 import org.bitbucket.inkytonik.cooma.truffle.runtime.ContinuationClosure;
 import org.bitbucket.inkytonik.cooma.truffle.runtime.RuntimeValue;
 import org.bitbucket.inkytonik.cooma.truffle.runtime.VarRuntimeValue;
@@ -13,9 +15,9 @@ import org.bitbucket.inkytonik.cooma.truffle.runtime.VarRuntimeValue;
 public class CoomaCasVTermNode extends CoomaTermNode {
 
     private final String x;
-    private final CoomaCaseTerm[] cs;
+    private final CoomaVariantCaseTerm[] cs;
 
-    public CoomaCasVTermNode(String x, CoomaCaseTerm[] cs) {
+    public CoomaCasVTermNode(String x, CoomaVariantCaseTerm[] cs) {
         this.x = x;
         this.cs = cs;
     }
@@ -26,7 +28,7 @@ public class CoomaCasVTermNode extends CoomaTermNode {
         if (value instanceof VarRuntimeValue) {
             VarRuntimeValue var = (VarRuntimeValue) value;
             String c1 = var.getC();
-            for (CoomaCaseTerm kase : cs) {
+            for (CoomaVariantCaseTerm kase : cs) {
                 if (c1.equals(kase.getC())) {
                     String k = kase.getK();
                     RuntimeValue cont = obtainFromRho(k);

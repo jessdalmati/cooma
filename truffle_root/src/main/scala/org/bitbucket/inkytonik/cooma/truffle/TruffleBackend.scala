@@ -28,8 +28,13 @@ class TruffleBackend(config : Config) extends Backend {
 
     type CaseTerm = CoomaCaseTerm
 
-    def casV(x : String, cs : Vector[CaseTerm]) : CoomaTermNode =
-        new CoomaCasVTermNode(x, cs.toArray)
+    def casV(x : String, cs : Vector[CaseTerm]) : CoomaTermNode = {
+        val vcs = cs.flatMap {
+            case kase : CoomaVariantCaseTerm => Some(kase)
+            case _                           => None
+        }
+        new CoomaCasVTermNode(x, vcs.toArray)
+    }
 
     def letC(k : String, x : String, t : Term, body : Term) : CoomaTermNode =
         new CoomaLetCTermNode(k, x, t, body)
@@ -42,8 +47,11 @@ class TruffleBackend(config : Config) extends Backend {
     def letV(x : String, v : Value, body : Term) : Term =
         new CoomaLetVTermNode(x, v, body)
 
-    def caseTerm(c : String, k : String) : CaseTerm =
-        new CoomaCaseTerm(c, k)
+    def vCaseTerm(c : String, k : String) : CaseTerm =
+        new CoomaVariantCaseTerm(c, k)
+
+    def dCaseTerm(k : String) : CaseTerm =
+        new CoomaDefaultCaseTerm(k)
 
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         new CoomaDefTerm(f, k, x, body)

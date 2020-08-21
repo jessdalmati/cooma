@@ -6,13 +6,11 @@ import org.bitbucket.inkytonik.cooma.truffle.nodes.CoomaNode;
 
 @Getter
 @NodeInfo(shortName = "caseTerm", description = "A single case in casV")
-public class CoomaCaseTerm extends CoomaNode {
+public abstract class CoomaCaseTerm extends CoomaNode {
 
-    private final String c;
     private final String k;
 
-    public CoomaCaseTerm(String c, String k) {
-        this.c = c;
+    public CoomaCaseTerm(String k) {
         this.k = k;
     }
 
