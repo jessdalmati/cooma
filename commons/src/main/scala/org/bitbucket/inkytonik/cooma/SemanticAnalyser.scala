@@ -116,8 +116,8 @@ class SemanticAnalyser(
         c match {
             case tree.parent(m : Mat) =>
                 checkCaseDup(c, m) ++
-                    checkCaseExpressionTypes(c, m) ++
-                    checkCaseVariants(c, m)
+                    checkCaseExpressionTypes(c, m) //++
+            //checkCaseVariants(c, m)
             case _ =>
                 sys.error(s"checkCase: can't find enclosing match")
         }

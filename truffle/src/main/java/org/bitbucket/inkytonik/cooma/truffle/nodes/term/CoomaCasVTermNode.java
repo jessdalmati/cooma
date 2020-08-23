@@ -15,11 +15,13 @@ import org.bitbucket.inkytonik.cooma.truffle.runtime.VarRuntimeValue;
 public class CoomaCasVTermNode extends CoomaTermNode {
 
     private final String x;
-    private final CoomaVariantCaseTerm[] cs;
+    private final CoomaVariantCaseTerm[] vcs;
+    private final CoomaDefaultCaseTerm dcs;
 
-    public CoomaCasVTermNode(String x, CoomaVariantCaseTerm[] cs) {
+    public CoomaCasVTermNode(String x, CoomaVariantCaseTerm[] vcs, CoomaDefaultCaseTerm dcs) {
         this.x = x;
-        this.cs = cs;
+        this.vcs = vcs;
+        this.dcs = dcs;
     }
 
     @Override
@@ -28,7 +30,7 @@ public class CoomaCasVTermNode extends CoomaTermNode {
         if (value instanceof VarRuntimeValue) {
             VarRuntimeValue var = (VarRuntimeValue) value;
             String c1 = var.getC();
-            for (CoomaVariantCaseTerm kase : cs) {
+            for (CoomaVariantCaseTerm kase : vcs) {
                 if (c1.equals(kase.getC())) {
                     String k = kase.getK();
                     RuntimeValue cont = obtainFromRho(k);
@@ -43,7 +45,21 @@ public class CoomaCasVTermNode extends CoomaTermNode {
                     }
                 }
             }
-            throw new CoomaException(String.format("interpret CasV: can't find case for variant %s", c1), this);
+            if(!dcs.equals(null)) {
+                String k = dcs.getK();
+                RuntimeValue cont = obtainFromRho(k);
+                if (cont instanceof ContinuationClosure) {
+                    ContinuationClosure closure = (ContinuationClosure) cont;
+                    Rho p1 = closure.getRho()
+                            .extend(closure.getX(), var.getV());
+                    replaceRho(p1);
+                    return closure.getZ().executeGeneric(frame);
+                } else {
+                    throw new CoomaException(String.format("interpret CasV: %s is %s", k, cont.print()), this);
+                }
+            } else {
+                throw new CoomaException(String.format("interpret CasV: can't find case for variant %s", c1), this);
+            }
         } else {
             throw new CoomaException(String.format("interpret CasV: %s is %s", x, value.print()), this);
         }

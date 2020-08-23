@@ -372,7 +372,26 @@ trait Compiler {
     }
 
     def compileMatch(e : Expression, cs : Vector[Case], kappa : String => Term) : Term = {
-        val cks = cs.map(c => (c, fresh("k")))
+        val vcs : Vector[Case] = cs.takeWhile {
+            _.pattern match {
+                case VPtrn(_, _) => true
+                case DPtrn(_)    => false
+            }
+        }
+
+        val dcs : Option[Case] = cs.collectFirst {
+            c =>
+                c.pattern match {
+                    case DPtrn(_) => c
+                }
+        }
+
+        val ks = dcs match {
+            case Some(dptrn) => vcs :+ dptrn
+            case None        => vcs
+        }
+
+        val cks = ks.map(c => (c, fresh("k")))
 
         val caseTerms = cks.map {
             case (c, k) => c.pattern match {
