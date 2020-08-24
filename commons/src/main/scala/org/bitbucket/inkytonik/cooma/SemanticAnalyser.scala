@@ -116,22 +116,25 @@ class SemanticAnalyser(
         c match {
             case tree.parent(m : Mat) =>
                 checkCaseDup(c, m) ++
-                    checkCaseExpressionTypes(c, m) //++
-            //checkCaseVariants(c, m)
+                    checkCaseExpressionTypes(c, m) ++
+                    checkCaseVariants(c, m)
             case _ =>
                 sys.error(s"checkCase: can't find enclosing match")
         }
 
     def checkCaseDup(c : Case, m : Mat) : Messages =
-        if (isDuplicateCase(c, m))
-            error(c, s"duplicate case for variant ${
-                c.pattern match {
-                    case VPtrn(identifier, _) => identifier
-                    case DPtrn(idnDef)        => idnDef.identifier
-                }
-            }")
-        else
-            noMessages
+        isDuplicateCase(c, m) match {
+            case true => (c.pattern match {
+                case VPtrn(identifier, _) => Some(identifier)
+                case DPtrn(_)             => None
+            }) match {
+                case Some(idn) => error(c, s"duplicate case for variant ${
+                    idn
+                }")
+                case None => noMessages
+            }
+            case _ => noMessages
+        }
 
     def checkCaseExpressionTypes(c : Case, m : Mat) : Messages =
         matchType(m) match {
@@ -144,23 +147,43 @@ class SemanticAnalyser(
     def checkCaseVariants(c : Case, m : Mat) : Messages =
         tipe(m.expression) match {
             case Some(t @ VarT(fieldTypes)) =>
-                fieldTypes.find(f => f.identifier == (c.pattern match {
-                    case VPtrn(identifier, _) => identifier
-                    case DPtrn(idnDef)        => idnDef.identifier
-                })) match {
-                    case None =>
-                        error(c, s"variant ${
-                            c.pattern match {
-                                case VPtrn(identifier, _) => identifier
-                                case DPtrn(idnDef)        => idnDef.identifier
-                            }
+                fieldTypes.find(f => c.pattern match {
+                    case VPtrn(idn, _) => f.identifier == idn
+                    case DPtrn(_)      => true
+                }) match {
+                    case None => c.pattern match {
+                        case VPtrn(identifier, _) => error(c, s"variant ${
+                            identifier
                         } not present in matched type ${show(alias(t))}")
+                        case _ => noMessages
+                    }
                     case _ =>
                         noMessages
                 }
             case _ =>
                 noMessages
         }
+
+    // def checkCaseVariants(c : Case, m : Mat) : Messages =
+    //     tipe(m.expression) match {
+    //         case Some(t @ VarT(fieldTypes)) =>
+    //             fieldTypes.find(f => f.identifier == (c.pattern match {
+    //                 case VPtrn(identifier, _) => identifier
+    //                 case DPtrn(idnDef)        => idnDef.identifier
+    //             })) match {
+    //                 case None =>
+    //                     error(c, s"variant ${
+    //                         c.pattern match {
+    //                             case VPtrn(identifier, _) => identifier
+    //                             case DPtrn(idnDef)        => idnDef.identifier
+    //                         }
+    //                     } not present in matched type ${show(alias(t))}")
+    //                 case _ =>
+    //                     noMessages
+    //             }
+    //         case _ =>
+    //             noMessages
+    //     }
 
     def checkConcat(e : Cat, l : Expression, r : Expression) : Messages = {
         checkRecordUse(l) ++
@@ -191,12 +214,25 @@ class SemanticAnalyser(
                 error(e, s"match of non-variant type ${show(alias(t))}")
         }
 
+    // def checkMatchCaseNum(e : Expression, cs : Vector[Case]) : Messages =
+    //     tipe(e) match {
+    //         case Some(VarT(fields)) if fields.length != cs.length =>
+    //             error(cs(0), s"expected ${fields.length} cases, got ${cs.length}")
+    //         case _ =>
+    //             noMessages
+    //     }
+
     def checkMatchCaseNum(e : Expression, cs : Vector[Case]) : Messages =
         tipe(e) match {
-            case Some(VarT(fields)) if fields.length != cs.length =>
-                error(cs(0), s"expected ${fields.length} cases, got ${cs.length}")
-            case _ =>
-                noMessages
+            case Some(VarT(fields)) => (cs.find(k => k.pattern match {
+                case DPtrn(_) => true
+                case _        => false
+            })) match {
+                case None if fields.length != cs.length =>
+                    error(cs(0), s"expected ${fields.length} cases, got ${cs.length}")
+                case _ => noMessages
+            }
+            case _ => noMessages
         }
 
     def checkRecordUse(e : Expression) : Messages =
@@ -326,13 +362,13 @@ class SemanticAnalyser(
         }
 
     def isDuplicateCase(c : Case, m : Mat) =
-        m.cases.map(_.pattern match {
-            case VPtrn(identifier, _) => identifier
-            case DPtrn(idnDef)        => idnDef.identifier
-        }).count(_ == (c.pattern match {
-            case VPtrn(identifier, _) => identifier
-            case DPtrn(idnDef)        => idnDef.identifier
-        })) > 1
+        m.cases.flatMap(_.pattern match {
+            case VPtrn(identifier, _) => Some(identifier)
+            case DPtrn(idnDef)        => None
+        }).count(k => c.pattern match {
+            case VPtrn(identifier, _) => k == identifier
+            case _                    => false
+        }) > 1
 
     lazy val fieldNames : Rec => Vector[String] =
         attr {
