@@ -109,9 +109,10 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("l")),
                 Vector(
-                    Case(VPtrn("False", IdnDef("_")), False()),
-                    Case(VPtrn("True", IdnDef("_")), Idn(IdnUse("r")))
-                )
+                    Case(Pattern("False", IdnDef("_")), False()),
+                    Case(Pattern("True", IdnDef("_")), Idn(IdnUse("r")))
+                ),
+                None
             )
         )
 
@@ -123,9 +124,10 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("b")),
                 Vector(
-                    Case(VPtrn("False", IdnDef("_")), True()),
-                    Case(VPtrn("True", IdnDef("_")), False())
-                )
+                    Case(Pattern("False", IdnDef("_")), True()),
+                    Case(Pattern("True", IdnDef("_")), False())
+                ),
+                None
             )
         )
 
@@ -138,9 +140,10 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("l")),
                 Vector(
-                    Case(VPtrn("False", IdnDef("_")), Idn(IdnUse("r"))),
-                    Case(VPtrn("True", IdnDef("_")), True())
-                )
+                    Case(Pattern("False", IdnDef("_")), Idn(IdnUse("r"))),
+                    Case(Pattern("True", IdnDef("_")), True())
+                ),
+                None
             )
         )
 
@@ -258,8 +261,8 @@ trait Compiler {
             case Ints() =>
                 compile(ints, kappa)
 
-            case Mat(e, cs) =>
-                compileMatch(e, cs, kappa)
+            case Mat(e, cs, d) =>
+                compileMatch(e, cs, d, kappa)
 
             case Num(n) =>
                 val i = fresh("i")
@@ -371,44 +374,37 @@ trait Compiler {
         }
     }
 
-    def compileMatch(e : Expression, cs : Vector[Case], kappa : String => Term) : Term = {
-        val vcs : Vector[Case] = cs.takeWhile {
-            _.pattern match {
-                case VPtrn(_, _) => true
-                case DPtrn(_)    => false
-            }
+    def compileMatch(e : Expression, cs : Vector[Case], d : Option[DefaultCase], kappa : String => Term) : Term = {
+
+        val cks = cs.map(c => (c, fresh("k")))
+
+        val dks = d match {
+            case Some(c) => (c, fresh("k"))
+            case None    => (DefaultCase(IdnDef("_"), Uni()), "$halt")
         }
 
-        val dcs : Option[Case] = cs.collectFirst {
-            c =>
-                c.pattern match {
-                    case DPtrn(_) => c
-                }
-        }
-
-        val ks = dcs match {
-            case Some(dptrn) => vcs :+ dptrn
-            case None        => vcs
-        }
-
-        val cks = ks.map(c => (c, fresh("k")))
+        val aks = cks :+ dks
 
         val caseTerms = cks.map {
             case (c, k) => c.pattern match {
-                case VPtrn(identifier, _) => vCaseTerm(identifier, k)
-                case DPtrn(_)             => dCaseTerm(k)
+                case Pattern(identifier, _) => vCaseTerm(identifier, k)
             }
         }
 
+        val defaultCaseTerm = dks match {
+            case (DefaultCase(idn, _), k) => dCaseTerm(k)
+        }
+
         compile(e, z =>
-            cks.foldLeft(casV(z, caseTerms)) {
+            aks.foldLeft(casV(z, caseTerms, defaultCaseTerm)) {
                 case (t, (Case(pattern, ei), ki)) =>
                     pattern match {
-                        case VPtrn(_, IdnDef(xi)) =>
-                            letC(ki, xi, compile(ei, zi => kappa(zi)), t)
-                        case DPtrn(IdnDef(xi)) =>
+                        case Pattern(_, IdnDef(xi)) =>
                             letC(ki, xi, compile(ei, zi => kappa(zi)), t)
                     }
+                case (t, (DefaultCase(IdnDef(xi), ei), ki)) =>
+                    letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                case _ => sys.error(s"if you reading this then shit be really broke")
             })
     }
 
@@ -488,8 +484,8 @@ trait Compiler {
             case Ints() =>
                 tailCompile(ints, k)
 
-            case Mat(e, cs) =>
-                tailCompileMatch(e, cs, k)
+            case Mat(e, cs, d) =>
+                tailCompileMatch(e, cs, d, k)
 
             case Num(n) =>
                 val i = fresh("i")
@@ -573,24 +569,36 @@ trait Compiler {
                 tailCompile(e, k)
         }
 
-    def tailCompileMatch(e : Expression, cs : Vector[Case], k : String) : Term = {
+    def tailCompileMatch(e : Expression, cs : Vector[Case], d : Option[DefaultCase], k : String) : Term = {
         val cks = cs.map(c => (c, fresh("k")))
+
+        val dks = d match {
+            case Some(c) => (c, fresh("k"))
+            case None    => (DefaultCase(IdnDef("_"), Uni()), "$halt")
+        }
+
+        val aks = cks :+ dks
+
         val caseTerms = cks.map {
             case (c, k) => c.pattern match {
-                case VPtrn(identifier, _) => vCaseTerm(identifier, k)
-                case DPtrn(_)             => dCaseTerm(k)
+                case Pattern(identifier, _) => vCaseTerm(identifier, k)
             }
         }
 
+        val defaultCaseTerm = dks match {
+            case (DefaultCase(idn, _), k) => dCaseTerm(k)
+        }
+
         compile(e, z =>
-            cks.foldLeft(casV(z, caseTerms)) {
+            aks.foldLeft(casV(z, caseTerms, defaultCaseTerm)) {
                 case (t, (Case(pattern, ei), ki)) =>
                     pattern match {
-                        case VPtrn(_, IdnDef(xi)) =>
-                            letC(ki, xi, tailCompile(ei, k), t)
-                        case DPtrn(IdnDef(xi)) =>
+                        case Pattern(_, IdnDef(xi)) =>
                             letC(ki, xi, tailCompile(ei, k), t)
                     }
+                case (t, (DefaultCase(IdnDef(xi), ei), ki)) =>
+                    letC(ki, xi, tailCompile(ei, k), t)
+                case _ => sys.error(s"if you reading this then shit be really broke")
             })
     }
 

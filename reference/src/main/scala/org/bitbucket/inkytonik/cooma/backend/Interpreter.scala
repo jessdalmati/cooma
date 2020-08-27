@@ -95,14 +95,13 @@ class Interpreter(config : Config) {
                             sys.error(s"interpret AppF: $f is $v")
                     }
 
-                case CasV(x, cs) =>
+                case CasV(x, cs, d) =>
                     lookupR(rho, x) match {
                         case VarR(c1, v) =>
                             val optK =
                                 cs.collectFirst {
                                     case VCaseTerm(c2, k) if c1 == c2 =>
                                         k
-                                    case DCaseTerm(k) => k
                                 }
                             optK match {
                                 case Some(k) =>
@@ -115,7 +114,16 @@ class Interpreter(config : Config) {
                                     }
 
                                 case None =>
-                                    sys.error(s"interpret CasV: can't find case for variant $c1")
+                                    d match {
+                                        case DCaseTerm(k) =>
+                                            lookupC(rho, k) match {
+                                                case ClsC(rho2, y, t) =>
+                                                    interpretAux(ConsVE(rho2, y, v), t)
+
+                                                case v =>
+                                                    sys.error(s"interpret CasV: $k is $v")
+                                            }
+                                    }
                             }
 
                         case err : ErrR =>
