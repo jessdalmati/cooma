@@ -200,7 +200,7 @@ class SemanticAnalyser(
             })
     }
 
-    def checkMatch(e : Expression, cs : Vector[Case], d : Option[DefaultCase]) : Messages =
+    def checkMatch(e : Expression, cs : Vector[Case], d : DefaultCase) : Messages =
         checkMatchDiscType(e) ++
             checkMatchCaseNum(e, cs, d)
 
@@ -220,10 +220,10 @@ class SemanticAnalyser(
     //             noMessages
     //     }
 
-    def checkMatchCaseNum(e : Expression, cs : Vector[Case], d : Option[DefaultCase]) : Messages =
+    def checkMatchCaseNum(e : Expression, cs : Vector[Case], d : DefaultCase) : Messages =
         d match {
-            case Some(d) => noMessages
-            case None => tipe(e) match {
+            case DCase(_, _) => noMessages
+            case ECase() => tipe(e) match {
                 case Some(VarT(fields)) if fields.length != cs.length =>
                     error(cs(0), s"expected ${fields.length} cases, got ${cs.length}")
                 case _ => noMessages

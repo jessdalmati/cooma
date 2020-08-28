@@ -223,8 +223,8 @@ class ReferenceBackend(
                 k <+> x
             case AppF(f, k, x) =>
                 f <+> k <+> x
-            case CasV(x, ks) =>
-                "case" <+> value(x) <+> ssep(ks.map(toDocCaseTerm), space)
+            case CasV(x, ks, d) =>
+                "case" <+> value(x) <+> ssep(ks.map(toDocCaseTerm), space) <+> toDocCaseTerm(d)
             case LetC(k, x, t, body) =>
                 "letc" <+> value(k) <+> value(x) <+> "=" <+> align(toDocTerm(t)) <@>
                     toDocTerm(body)

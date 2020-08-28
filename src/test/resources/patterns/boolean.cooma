@@ -3,7 +3,7 @@
         b match {
             case False(_) =>
                 1
-            case _   	  =>
+            case x   	  =>
                 2
         }
     { a = f(false), b = f(true) }

@@ -112,7 +112,7 @@ trait Compiler {
                     Case(Pattern("False", IdnDef("_")), False()),
                     Case(Pattern("True", IdnDef("_")), Idn(IdnUse("r")))
                 ),
-                None
+                ECase()
             )
         )
 
@@ -127,7 +127,7 @@ trait Compiler {
                     Case(Pattern("False", IdnDef("_")), True()),
                     Case(Pattern("True", IdnDef("_")), False())
                 ),
-                None
+                ECase()
             )
         )
 
@@ -143,7 +143,7 @@ trait Compiler {
                     Case(Pattern("False", IdnDef("_")), Idn(IdnUse("r"))),
                     Case(Pattern("True", IdnDef("_")), True())
                 ),
-                None
+                ECase()
             )
         )
 
@@ -374,13 +374,13 @@ trait Compiler {
         }
     }
 
-    def compileMatch(e : Expression, cs : Vector[Case], d : Option[DefaultCase], kappa : String => Term) : Term = {
+    def compileMatch(e : Expression, cs : Vector[Case], d : DefaultCase, kappa : String => Term) : Term = {
 
         val cks = cs.map(c => (c, fresh("k")))
 
         val dks = d match {
-            case Some(c) => (c, fresh("k"))
-            case None    => (DefaultCase(IdnDef("_"), Uni()), "$halt")
+            case DCase(idn, e) => (DCase(idn, e), fresh("k"))
+            case ECase()       => (DCase(IdnDef("_"), Uni()), "$halt")
         }
 
         val aks = cks :+ dks
@@ -392,7 +392,7 @@ trait Compiler {
         }
 
         val defaultCaseTerm = dks match {
-            case (DefaultCase(idn, _), k) => dCaseTerm(k)
+            case (DCase(idn, _), k) => dCaseTerm(k)
         }
 
         compile(e, z =>
@@ -402,7 +402,7 @@ trait Compiler {
                         case Pattern(_, IdnDef(xi)) =>
                             letC(ki, xi, compile(ei, zi => kappa(zi)), t)
                     }
-                case (t, (DefaultCase(IdnDef(xi), ei), ki)) =>
+                case (t, (DCase(IdnDef(xi), ei), ki)) =>
                     letC(ki, xi, compile(ei, zi => kappa(zi)), t)
                 case _ => sys.error(s"if you reading this then shit be really broke")
             })
@@ -569,12 +569,12 @@ trait Compiler {
                 tailCompile(e, k)
         }
 
-    def tailCompileMatch(e : Expression, cs : Vector[Case], d : Option[DefaultCase], k : String) : Term = {
+    def tailCompileMatch(e : Expression, cs : Vector[Case], d : DefaultCase, k : String) : Term = {
         val cks = cs.map(c => (c, fresh("k")))
 
         val dks = d match {
-            case Some(c) => (c, fresh("k"))
-            case None    => (DefaultCase(IdnDef("_"), Uni()), "$halt")
+            case DCase(idn, e) => (DCase(idn, e), fresh("k"))
+            case ECase()       => (DCase(IdnDef("_"), Uni()), "$halt")
         }
 
         val aks = cks :+ dks
@@ -586,7 +586,7 @@ trait Compiler {
         }
 
         val defaultCaseTerm = dks match {
-            case (DefaultCase(idn, _), k) => dCaseTerm(k)
+            case (DCase(idn, _), k) => dCaseTerm(k)
         }
 
         compile(e, z =>
@@ -596,7 +596,7 @@ trait Compiler {
                         case Pattern(_, IdnDef(xi)) =>
                             letC(ki, xi, tailCompile(ei, k), t)
                     }
-                case (t, (DefaultCase(IdnDef(xi), ei), ki)) =>
+                case (t, (DCase(IdnDef(xi), ei), ki)) =>
                     letC(ki, xi, tailCompile(ei, k), t)
                 case _ => sys.error(s"if you reading this then shit be really broke")
             })

@@ -123,6 +123,7 @@ class Interpreter(config : Config) {
                                                 case v =>
                                                     sys.error(s"interpret CasV: $k is $v")
                                             }
+                                        case _ => sys.error(s"idk bro")
                                     }
                             }
 
