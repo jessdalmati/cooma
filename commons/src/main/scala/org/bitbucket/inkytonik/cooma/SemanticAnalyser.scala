@@ -124,7 +124,11 @@ class SemanticAnalyser(
 
     def checkCaseDup(c : Case, m : Mat) : Messages =
         if (isDuplicateCase(c, m))
-            error(c, s"duplicate case for variant ${c.identifier}")
+            error(c, s"duplicate case for variant ${
+                c.pattern match {
+                    case Pattern(idn, _) => idn
+                }
+            }")
         else
             noMessages
 
@@ -139,9 +143,15 @@ class SemanticAnalyser(
     def checkCaseVariants(c : Case, m : Mat) : Messages =
         tipe(m.expression) match {
             case Some(t @ VarT(fieldTypes)) =>
-                fieldTypes.find(f => f.identifier == c.identifier) match {
+                fieldTypes.find(f => f.identifier == (c.pattern match {
+                    case Pattern(idn, _) => idn
+                })) match {
                     case None =>
-                        error(c, s"variant ${c.identifier} not present in matched type ${show(alias(t))}")
+                        error(c, s"variant ${
+                            c.pattern match {
+                                case Pattern(idn, _) => idn
+                            }
+                        } not present in matched type ${show(alias(t))}")
                     case _ =>
                         noMessages
                 }
@@ -273,7 +283,7 @@ class SemanticAnalyser(
         case n @ Argument(IdnDef(i), _, _) if !isWildcard(i) =>
             defineIfNew(out(n), i, MultipleEntity(), ArgumentEntity(n))
 
-        case tree.parent.pair(n @ IdnDef(i), c : Case) if !isWildcard(i) =>
+        case tree.parent.pair(n @ Pattern(_, IdnDef(i)), c : Case) if !isWildcard(i) =>
             defineIfNew(out(n), i, MultipleEntity(), CaseValueEntity(c))
 
         case tree.parent.pair(n @ IdnDef(i), d : Def) if !isWildcard(i) =>
@@ -309,7 +319,11 @@ class SemanticAnalyser(
         }
 
     def isDuplicateCase(c : Case, m : Mat) =
-        m.cases.map(_.identifier).count(_ == c.identifier) > 1
+        m.cases.map(_.pattern match {
+            case Pattern(idn, _) => idn
+        }).count(_ == (c.pattern match {
+            case Pattern(idn, _) => idn
+        })) > 1
 
     lazy val fieldNames : Rec => Vector[String] =
         attr {
@@ -587,7 +601,7 @@ class SemanticAnalyser(
             case m =>
                 val caseTypes =
                     m.cases.map {
-                        case Case(_, _, e) =>
+                        case Case(_, e) =>
                             tipe(e)
                     }.distinct
                 if (caseTypes contains None)

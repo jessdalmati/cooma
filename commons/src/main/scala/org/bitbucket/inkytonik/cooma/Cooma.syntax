@@ -55,7 +55,10 @@ ArgumentType =
   (IdnDef sp ":")? Expression.
 
 Case =
-  \n "case" Identifier '(' IdnDef ")" '=>' nestnl(Expression).
+  \n "case" Pattern '=>' nestnl(Expression).
+
+Pattern = 
+  Identifier '(' IdnDef ")". 
 
 Default = 
     \n "case" "$" '=>' nestnl(Expression) {Dflt}
