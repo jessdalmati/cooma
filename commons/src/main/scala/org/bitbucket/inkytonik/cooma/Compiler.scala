@@ -111,7 +111,8 @@ trait Compiler {
                 Vector(
                     Case("False", IdnDef("_"), False()),
                     Case("True", IdnDef("_"), Idn(IdnUse("r")))
-                )
+                ),
+                NoDflt()
             )
         )
 
@@ -125,7 +126,8 @@ trait Compiler {
                 Vector(
                     Case("False", IdnDef("_"), True()),
                     Case("True", IdnDef("_"), False())
-                )
+                ),
+                NoDflt()
             )
         )
 
@@ -140,7 +142,8 @@ trait Compiler {
                 Vector(
                     Case("False", IdnDef("_"), Idn(IdnUse("r"))),
                     Case("True", IdnDef("_"), True())
-                )
+                ),
+                NoDflt()
             )
         )
 
@@ -258,8 +261,8 @@ trait Compiler {
             case Ints() =>
                 compile(ints, kappa)
 
-            case Mat(e, cs) =>
-                compileMatch(e, cs, kappa)
+            case Mat(e, cs, d) =>
+                compileMatch(e, cs, d, kappa)
 
             case Num(n) =>
                 val i = fresh("i")
@@ -371,15 +374,30 @@ trait Compiler {
         }
     }
 
-    def compileMatch(e : Expression, cs : Vector[Case], kappa : String => Term) : Term = {
+    def compileMatch(e : Expression, cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
         val cks = cs.map(c => (c, fresh("k")))
+        val dk = fresh("k")
         val caseTerms = cks.map { case (c, k) => caseTerm(c.identifier, k) }
-        compile(e, z =>
-            cks.foldLeft(casV(z, caseTerms)) {
-                case (t, (Case(_, IdnDef(xi), ei), ki)) =>
-                    letC(ki, xi, compile(ei, zi => kappa(zi)),
-                        t)
-            })
+
+        // compile(e, z =>
+        //     cks.foldLeft(casV(z, caseTerms)) {
+        //         case (t, (Case(_, IdnDef(xi), ei), ki)) =>
+        //             letC(ki, xi, compile(ei, zi => kappa(zi)),
+        //                 t)
+        //     })
+
+        d match {
+            case NoDflt() => compile(e, z =>
+                cks.foldLeft(letC(dk, z, compileHalt(Num(-1)), casV(z, caseTerms, dk))) {
+                    case (t, (Case(_, IdnDef(xi), ei), ki)) =>
+                        letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                })
+            case Dflt(d) => compile(e, z =>
+                cks.foldLeft(letC(dk, z, compile(d, zi => kappa(zi)), casV(z, caseTerms, dk))) {
+                    case (t, (Case(_, IdnDef(xi), ei), ki)) =>
+                        letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                })
+        }
     }
 
     def compileRec(
@@ -458,8 +476,8 @@ trait Compiler {
             case Ints() =>
                 tailCompile(ints, k)
 
-            case Mat(e, cs) =>
-                tailCompileMatch(e, cs, k)
+            case Mat(e, cs, d) =>
+                tailCompileMatch(e, cs, d, k)
 
             case Num(n) =>
                 val i = fresh("i")
@@ -543,15 +561,30 @@ trait Compiler {
                 tailCompile(e, k)
         }
 
-    def tailCompileMatch(e : Expression, cs : Vector[Case], k : String) : Term = {
+    def tailCompileMatch(e : Expression, cs : Vector[Case], d : Default, k : String) : Term = {
         val cks = cs.map(c => (c, fresh("k")))
+        val dk = fresh("k")
         val caseTerms = cks.map { case (c, k) => caseTerm(c.identifier, k) }
-        compile(e, z =>
-            cks.foldLeft(casV(z, caseTerms)) {
-                case (t, (Case(vi, IdnDef(xi), ei), ki)) =>
-                    letC(ki, xi, tailCompile(ei, k),
-                        t)
-            })
+
+        // compile(e, z =>
+        //     cks.foldLeft(casV(z, caseTerms)) {
+        //         case (t, (Case(vi, IdnDef(xi), ei), ki)) =>
+        //             letC(ki, xi, tailCompile(ei, k),
+        //                 t)
+        //     })
+
+        d match {
+            case NoDflt() => compile(e, z =>
+                cks.foldLeft(letC(dk, z, compileHalt(Num(-1)), casV(z, caseTerms, dk))) {
+                    case (t, (Case(_, IdnDef(xi), ei), ki)) =>
+                        letC(ki, xi, tailCompile(ei, k), t)
+                })
+            case Dflt(d) => compile(e, z =>
+                cks.foldLeft(letC(dk, z, tailCompile(d, k), casV(z, caseTerms, dk))) {
+                    case (t, (Case(_, IdnDef(xi), ei), ki)) =>
+                        letC(ki, xi, tailCompile(ei, k), t)
+                })
+        }
     }
 
 }

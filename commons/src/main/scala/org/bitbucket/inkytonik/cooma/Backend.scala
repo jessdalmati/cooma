@@ -5,7 +5,7 @@ trait Backend {
     type Term
     def appC(k : String, x : String) : Term
     def appF(f : String, k : String, x : String) : Term
-    def casV(x : String, cs : Vector[CaseTerm]) : Term
+    def casV(x : String, cs : Vector[CaseTerm], d : String) : Term
     def letC(k : String, x : String, t : Term, body : Term) : Term
     def letF(ds : Vector[DefTerm], body : Term) : Term
     def letV(x : String, v : Value, body : Term) : Term

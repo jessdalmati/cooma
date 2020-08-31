@@ -42,7 +42,7 @@ class ReferenceBackend(
     sealed abstract class Term
     case class AppC(k : String, x : String) extends Term
     case class AppF(f : String, k : String, x : String) extends Term
-    case class CasV(x : String, ks : Vector[CaseTerm]) extends Term
+    case class CasV(x : String, ks : Vector[CaseTerm], d : String) extends Term
     case class LetC(k : String, x : String, t : Term, body : Term) extends Term
     case class LetF(ds : Vector[DefTerm], body : Term) extends Term
     case class LetV(x : String, v : Value, body : Term) extends Term
@@ -60,8 +60,8 @@ class ReferenceBackend(
     def appF(f : String, k : String, x : String) : Term =
         AppF(f, k, x)
 
-    def casV(x : String, cs : Vector[CaseTerm]) : Term =
-        CasV(x, cs)
+    def casV(x : String, cs : Vector[CaseTerm], d : String) : Term =
+        CasV(x, cs, d)
 
     def letC(k : String, x : String, t : Term, body : Term) : Term =
         LetC(k, x, t, body)
@@ -217,8 +217,8 @@ class ReferenceBackend(
                 k <+> x
             case AppF(f, k, x) =>
                 f <+> k <+> x
-            case CasV(x, ks) =>
-                "case" <+> value(x) <+> ssep(ks.map(toDocCaseTerm), space)
+            case CasV(x, ks, d) =>
+                "case" <+> value(x) <+> ssep(ks.map(toDocCaseTerm), space) <+> value(d)
             case LetC(k, x, t, body) =>
                 "letc" <+> value(k) <+> value(x) <+> "=" <+> align(toDocTerm(t)) <@>
                     toDocTerm(body)

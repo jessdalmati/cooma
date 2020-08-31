@@ -61,8 +61,8 @@ class SemanticAnalyser(
                             checkConcat(a, l, r)
                         case Idn(u @ IdnUse(i)) if entity(u) == UnknownEntity() =>
                             error(u, s"$i is not declared")
-                        case Mat(e, cs) =>
-                            checkMatch(e, cs)
+                        case Mat(e, cs, d) =>
+                            checkMatch(e, cs, d)
                         case Sel(e, f) =>
                             checkFieldUse(e, f)
                         case prm @ Prm(_, _) =>
@@ -166,9 +166,11 @@ class SemanticAnalyser(
             })
     }
 
-    def checkMatch(e : Expression, cs : Vector[Case]) : Messages =
-        checkMatchDiscType(e) ++
-            checkMatchCaseNum(e, cs)
+    def checkMatch(e : Expression, cs : Vector[Case], d : Default) : Messages =
+        checkMatchDiscType(e) ++ (d match {
+            case Dflt(_)  => noMessages
+            case NoDflt() => checkMatchCaseNum(e, cs)
+        })
 
     def checkMatchDiscType(e : Expression) : Messages =
         tipe(e) match {
@@ -554,7 +556,7 @@ class SemanticAnalyser(
         attr {
             case ArgumentEntity(n @ Argument(_, t, _)) =>
                 unalias(n, t)
-            case CaseValueEntity(tree.parent.pair(c, Mat(e, _))) =>
+            case CaseValueEntity(tree.parent.pair(c, Mat(e, _, _))) =>
                 tipe(e) match {
                     case Some(VarT(r)) if tree.index(c) - 1 < r.length =>
                         Some(r(tree.index(c) - 1).expression)
