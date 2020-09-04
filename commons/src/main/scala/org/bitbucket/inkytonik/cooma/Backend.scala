@@ -11,7 +11,8 @@ trait Backend {
     def letV(x : String, v : Value, body : Term) : Term
 
     type CaseTerm
-    def caseTerm(c : String, k : String) : CaseTerm
+    def vCaseTerm(c : String, k : String) : CaseTerm
+    def sCaseTerm(k : String) : CaseTerm
 
     type DefTerm
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm

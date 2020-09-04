@@ -47,7 +47,10 @@ class ReferenceBackend(
     case class LetF(ds : Vector[DefTerm], body : Term) extends Term
     case class LetV(x : String, v : Value, body : Term) extends Term
 
-    case class CaseTerm(c : String, k : String)
+    sealed abstract class CaseTerm
+    case class VCaseTerm(c : String, k : String) extends CaseTerm
+    case class SCaseTerm(k : String) extends CaseTerm
+
     case class DefTerm(f : String, k : String, x : String, body : Term)
 
     override type OutputValueR = ValueR
@@ -74,8 +77,11 @@ class ReferenceBackend(
     def letV(x : String, v : Value, body : Term) : Term =
         LetV(x, v, body)
 
-    def caseTerm(c : String, k : String) : CaseTerm =
-        CaseTerm(c, k)
+    def vCaseTerm(c : String, k : String) : CaseTerm =
+        VCaseTerm(c, k)
+
+    def sCaseTerm(k : String) : CaseTerm =
+        SCaseTerm(k)
 
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         DefTerm(f, k, x, body)
@@ -231,7 +237,10 @@ class ReferenceBackend(
         }
 
     def toDocCaseTerm(caseTerm : CaseTerm) : Doc =
-        '(' <> value(caseTerm.c) <+> value(caseTerm.k) <> ')'
+        caseTerm match {
+            case VCaseTerm(c, k) => '(' <> value(c) <+> value(k) <> ')'
+            case SCaseTerm(k)    => '(' <> value(k) <> ')'
+        }
 
     def toDocDefTerm(defTerm : DefTerm) : Doc =
         line <> value(defTerm.f) <+> value(defTerm.k) <+> value(defTerm.x) <+>

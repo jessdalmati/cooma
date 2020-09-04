@@ -109,8 +109,8 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("l")),
                 Vector(
-                    Case(Pattern("False", IdnDef("_")), False()),
-                    Case(Pattern("True", IdnDef("_")), Idn(IdnUse("r")))
+                    Case(VPtrn("False", IdnDef("_")), False()),
+                    Case(VPtrn("True", IdnDef("_")), Idn(IdnUse("r")))
                 ),
                 NoDflt()
             )
@@ -124,8 +124,8 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("b")),
                 Vector(
-                    Case(Pattern("False", IdnDef("_")), True()),
-                    Case(Pattern("True", IdnDef("_")), False())
+                    Case(VPtrn("False", IdnDef("_")), True()),
+                    Case(VPtrn("True", IdnDef("_")), False())
                 ),
                 NoDflt()
             )
@@ -140,8 +140,8 @@ trait Compiler {
             Mat(
                 Idn(IdnUse("l")),
                 Vector(
-                    Case(Pattern("False", IdnDef("_")), Idn(IdnUse("r"))),
-                    Case(Pattern("True", IdnDef("_")), True())
+                    Case(VPtrn("False", IdnDef("_")), Idn(IdnUse("r"))),
+                    Case(VPtrn("True", IdnDef("_")), True())
                 ),
                 NoDflt()
             )
@@ -378,28 +378,30 @@ trait Compiler {
         val cks = cs.map(c => (c, fresh("k")))
         val dk = fresh("k")
         val caseTerms = cks.map {
-            case (c, k) => caseTerm(c.pattern match {
-                case Pattern(identifier, _) => identifier
-            }, k)
+            case (c, k) => c.pattern match {
+                case VPtrn(idn, _) => vCaseTerm(idn, k)
+                case SPtrn(_)      => sCaseTerm(k)
+            }
         }
-
-        // compile(e, z =>
-        //     cks.foldLeft(casV(z, caseTerms)) {
-        //         case (t, (Case(_, IdnDef(xi), ei), ki)) =>
-        //             letC(ki, xi, compile(ei, zi => kappa(zi)),
-        //                 t)
-        //     })
 
         d match {
             case NoDflt() => compile(e, z =>
                 cks.foldLeft(letC(dk, z, compileHalt(Num(-1)), casV(z, caseTerms, dk))) {
-                    case (t, (Case(Pattern(_, IdnDef(xi)), ei), ki)) =>
-                        letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                    case (t, (Case(pattern, ei), ki)) => pattern match {
+                        case VPtrn(_, IdnDef(xi)) =>
+                            letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                        case SPtrn(IdnDef(xi)) =>
+                            letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                    }
                 })
             case Dflt(d) => compile(e, z =>
                 cks.foldLeft(letC(dk, z, compile(d, zi => kappa(zi)), casV(z, caseTerms, dk))) {
-                    case (t, (Case(Pattern(_, IdnDef(xi)), ei), ki)) =>
-                        letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                    case (t, (Case(pattern, ei), ki)) => pattern match {
+                        case VPtrn(_, IdnDef(xi)) =>
+                            letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                        case SPtrn(IdnDef(xi)) =>
+                            letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+                    }
                 })
         }
     }
@@ -569,28 +571,30 @@ trait Compiler {
         val cks = cs.map(c => (c, fresh("k")))
         val dk = fresh("k")
         val caseTerms = cks.map {
-            case (c, k) => caseTerm(c.pattern match {
-                case Pattern(identifier, _) => identifier
-            }, k)
+            case (c, k) => c.pattern match {
+                case VPtrn(idn, _) => vCaseTerm(idn, k)
+                case SPtrn(_)      => sCaseTerm(k)
+            }
         }
-
-        // compile(e, z =>
-        //     cks.foldLeft(casV(z, caseTerms)) {
-        //         case (t, (Case(vi, IdnDef(xi), ei), ki)) =>
-        //             letC(ki, xi, tailCompile(ei, k),
-        //                 t)
-        //     })
 
         d match {
             case NoDflt() => compile(e, z =>
                 cks.foldLeft(letC(dk, z, compileHalt(Num(-1)), casV(z, caseTerms, dk))) {
-                    case (t, (Case(Pattern(_, IdnDef(xi)), ei), ki)) =>
-                        letC(ki, xi, tailCompile(ei, k), t)
+                    case (t, (Case(pattern, ei), ki)) => pattern match {
+                        case VPtrn(_, IdnDef(xi)) =>
+                            letC(ki, xi, tailCompile(ei, k), t)
+                        case SPtrn(IdnDef(xi)) =>
+                            letC(ki, xi, tailCompile(ei, k), t)
+                    }
                 })
             case Dflt(d) => compile(e, z =>
                 cks.foldLeft(letC(dk, z, tailCompile(d, k), casV(z, caseTerms, dk))) {
-                    case (t, (Case(Pattern(_, IdnDef(xi)), ei), ki)) =>
-                        letC(ki, xi, tailCompile(ei, k), t)
+                    case (t, (Case(pattern, ei), ki)) => pattern match {
+                        case VPtrn(_, IdnDef(xi)) =>
+                            letC(ki, xi, tailCompile(ei, k), t)
+                        case SPtrn(IdnDef(xi)) =>
+                            letC(ki, xi, tailCompile(ei, k), t)
+                    }
                 })
         }
     }

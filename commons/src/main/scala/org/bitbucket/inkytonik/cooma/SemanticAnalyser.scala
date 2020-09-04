@@ -123,14 +123,7 @@ class SemanticAnalyser(
         }
 
     def checkCaseDup(c : Case, m : Mat) : Messages =
-        if (isDuplicateCase(c, m))
-            error(c, s"duplicate case for variant ${
-                c.pattern match {
-                    case Pattern(idn, _) => idn
-                }
-            }")
-        else
-            noMessages
+        isDuplicateCase(c, m)
 
     def checkCaseExpressionTypes(c : Case, m : Mat) : Messages =
         matchType(m) match {
@@ -141,22 +134,17 @@ class SemanticAnalyser(
         }
 
     def checkCaseVariants(c : Case, m : Mat) : Messages =
-        tipe(m.expression) match {
-            case Some(t @ VarT(fieldTypes)) =>
-                fieldTypes.find(f => f.identifier == (c.pattern match {
-                    case Pattern(idn, _) => idn
-                })) match {
-                    case None =>
-                        error(c, s"variant ${
-                            c.pattern match {
-                                case Pattern(idn, _) => idn
-                            }
-                        } not present in matched type ${show(alias(t))}")
-                    case _ =>
-                        noMessages
-                }
-            case _ =>
-                noMessages
+        c.pattern match {
+            case VPtrn(idn, _) => tipe(m.expression) match {
+                case Some(t @ VarT(fieldTypes)) =>
+                    fieldTypes.find(f => f.identifier == idn) match {
+                        case None =>
+                            error(c, s"variant ${idn} not present in matched type ${show(alias(t))}")
+                        case _ => noMessages
+                    }
+                case _ => noMessages
+            }
+            case _ => noMessages
         }
 
     def checkConcat(e : Cat, l : Expression, r : Expression) : Messages = {
@@ -283,7 +271,10 @@ class SemanticAnalyser(
         case n @ Argument(IdnDef(i), _, _) if !isWildcard(i) =>
             defineIfNew(out(n), i, MultipleEntity(), ArgumentEntity(n))
 
-        case tree.parent.pair(n @ Pattern(_, IdnDef(i)), c : Case) if !isWildcard(i) =>
+        case tree.parent.pair(n @ VPtrn(_, IdnDef(i)), c : Case) if !isWildcard(i) =>
+            defineIfNew(out(n), i, MultipleEntity(), CaseValueEntity(c))
+
+        case tree.parent.pair(n @ SPtrn(IdnDef(i)), c : Case) if !isWildcard(i) =>
             defineIfNew(out(n), i, MultipleEntity(), CaseValueEntity(c))
 
         case tree.parent.pair(n @ IdnDef(i), d : Def) if !isWildcard(i) =>
@@ -318,12 +309,18 @@ class SemanticAnalyser(
                 lookup(env(n), n.identifier, UnknownEntity())
         }
 
-    def isDuplicateCase(c : Case, m : Mat) =
-        m.cases.map(_.pattern match {
-            case Pattern(idn, _) => idn
-        }).count(_ == (c.pattern match {
-            case Pattern(idn, _) => idn
-        })) > 1
+    def isDuplicateCase(c : Case, m : Mat) : Messages =
+        c.pattern match {
+            case VPtrn(idn, _) =>
+                (m.cases.flatMap(_.pattern match {
+                    case VPtrn(idn, _) => Some(idn)
+                    case SPtrn(_)      => None
+                }).count(_ == idn) > 1) match {
+                    case true  => error(c, s"duplicate case for variant ${idn}")
+                    case false => noMessages
+                }
+            case SPtrn(_) => noMessages
+        }
 
     lazy val fieldNames : Rec => Vector[String] =
         attr {
