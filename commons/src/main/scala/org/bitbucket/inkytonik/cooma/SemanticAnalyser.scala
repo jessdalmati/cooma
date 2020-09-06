@@ -180,7 +180,11 @@ class SemanticAnalyser(
 
     def checkMatchCaseNum(e : Expression, cs : Vector[Case]) : Messages =
         tipe(e) match {
-            case Some(VarT(fields)) if fields.length != cs.length =>
+            case Some(VarT(fields)) if fields.length != cs.length
+                && !cs.exists(c => c.pattern match {
+                    case SPtrn(_) => true
+                    case _        => false
+                }) =>
                 error(cs(0), s"expected ${fields.length} cases, got ${cs.length}")
             case _ =>
                 noMessages
