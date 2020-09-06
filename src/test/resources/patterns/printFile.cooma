@@ -1,0 +1,5 @@
+fun (file : Reader, out : Writer) {
+	val in : String = file.read()
+
+	out.write(in)
+}
