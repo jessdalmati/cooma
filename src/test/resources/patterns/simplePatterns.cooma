@@ -1,0 +1,18 @@
+{
+    type Point = {x : Int, y : Int}
+    type Key = <w : Unit, a : Unit, s : Unit, d : Unit, space : Unit>
+
+    type Event = <key : Key, mouse : Point>
+
+    def handleEvent(e : Event) String = 
+    	e match {
+    		case key(k) => k match {
+    			 case a(_) => "move left"
+    			 case d(_) => "move right"
+    			 case _ => "invalid move"
+    		}
+    		case mouse(_) => "click click"
+    	}
+
+    handleEvent(<key = <a = {}>>)
+}

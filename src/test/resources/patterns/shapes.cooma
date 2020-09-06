@@ -1,0 +1,36 @@
+{
+    type RGB = {r: Int, g: Int, b: Int}
+    type HSB = {h: Int, s: Int, b: Int}
+
+    type Colour = <rgb: RGB, hsb: HSB>
+
+    type Shape = <rect: {x: Int, y: Int, w: Int, h: Int}, circ: {x: Int, y: Int, r: Int}, dot: {x: Int, y:Int}>
+
+    def on () String = "*"
+    def off() String = ""
+
+    def repeat(s: String, i: Int) String = 
+        Ints.lte(i, 0) match {
+            case True(_) => ""
+            case False(_) => Strings.concat(s, repeat(s, Ints.sub(i,1)))
+        }
+
+    // existing
+    def renderShape(s: Shape) String =
+        s match {
+            case dot(details)  =>  Strings.concat(Strings.concat(repeat("\n", details.y), repeat(" ", details.x)), "*")
+            case circ(details) => "circle"
+            case rect(details) => "rectangle"
+        }
+
+    // target
+    //def renderShape(s: Shape) String =
+    //    s match {
+    //        case dot({x=x,y=y}) => Strings.concat(Strings.concat(repeat("\n", y), repeat(" ", x)), "*") 
+    // I think it makes sense to allow dot({x,y}) as a shortcut where x and y are labels.
+    //        case circ(details) => "circle"
+    //        case rect(details) => "rectangle"
+    //    }
+    
+    renderShape(<dot = {x=1,y=1}>)
+}
