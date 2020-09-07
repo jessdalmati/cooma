@@ -1,0 +1,24 @@
+{
+	type Date = {day : Int, month : Int, year : Int}
+	type Weekday = <mon : Date, tue : Date, wed : Date, thu : Date, fri : Date>
+
+	def isTuesday(wd : Weekday) Boolean = 
+		wd match {
+			case tue(_) => true
+			case $      => false
+		}
+
+	def showTuesday(wd : Weekday) String = {
+		val tues : Boolean = isTuesday(wd)
+		tues match {
+			case True(_) => "Today is tuesday!"
+			case $ => "Today is not tuesday..."
+		}
+	}
+
+	val today : Date = {day = 5, month = 5, year = 1999}
+
+	val wd : Weekday = <wed = today>
+
+	showTuesday(wd)
+}

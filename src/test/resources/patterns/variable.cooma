@@ -1,0 +1,29 @@
+{
+	def decToBin(dec : Int, bin : Int, count : Int) Int = {
+		def remainder(n : Int, div : Int) Int = {
+			Ints.gte(n, div) match {
+				case True(_) => remainder(Ints.sub(n, div), div)
+				case x       => n
+			}
+		}
+
+
+		Ints.gt(dec, 0) match {
+			case True(_) => decToBin(
+								Ints.div(dec, 2), 
+								Ints.add(
+									bin, 
+									Ints.mul(remainder(dec, 2), 
+									Ints.pow(10, count))
+								), 
+								Ints.add(count, 1)
+							)
+			case x       => bin
+		}
+	}
+
+	def showBinary(n : Int) Int = 
+		decToBin(n, 0, 0)
+
+	showBinary(19)
+}
