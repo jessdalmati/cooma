@@ -1,0 +1,21 @@
+{
+	type Person = <male : Age, female : Age, nonBinary : Age>
+
+	type Age = <adult : Int, child : Int, senior : Int, teen : Int>
+
+	def isAdult(p : Person) Boolean = 
+		p match {
+			case male(adult(_)) => true
+			case female(adult(_)) => true
+			case nonBinary(adult(_)) => true
+			case _ => false
+		}
+
+	val person : Person = <male = <adult = 32>>
+
+	isAdult(person)
+}
+
+
+
+

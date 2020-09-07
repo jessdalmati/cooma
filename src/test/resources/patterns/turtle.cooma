@@ -1,0 +1,23 @@
+def (w : Writer) {
+	
+	type Move = <left : Int, right : Int, up : Int, down : Int>
+
+	def con(a : String, b : String) String = Strings.concat(a, b)
+	def substr(s : String, i : Int) String = Strings.substr(s, i)
+
+	def move(m : Move, pMoves : String, nMoves : String) String = 
+		m match {
+			case left(dist)  => 
+			case right(dist) =>	
+			case up(dist)    =>
+			case down(dist)  =>
+		}
+
+	def repeat(s : String, i : Int) String = 
+        Ints.lte(i, 0) match {
+            case True(_) => ""
+            case False(_) => con(s, repeat(s, Ints.sub(i,1)))
+
+    con(con(substr(pMoves, ), repeat("*", dist)), nMoves)
+
+}

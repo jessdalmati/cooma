@@ -1,0 +1,12 @@
+{
+	type Stroke = <star : Unit, 
+				   dash : Unit, 
+				   dot  : Unit>
+
+	type Line = <twoDash  : Stroke, 
+				 longDash : Stroke, 
+				 dotDash  : Stroke, 
+				 dotted   : Stroke, 
+				 dashed   : Stroke, 
+				 solid    : Stroke>
+}

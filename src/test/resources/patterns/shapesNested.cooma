@@ -1,0 +1,80 @@
+fun (w : Writer) {
+    type RGB = {r: Int, g: Int, b: Int}
+    type HSB = {h: Int, s: Int, b: Int}
+
+    type Colour = <rgb: RGB, hsb: HSB>
+
+    type Rect = {x: Int, y: Int, w: Int, h: Int}
+    type Circ = {x : Int, y : Int, r : Int}
+    type Ellipse = {x: Int, y: Int, w : Int, h : Int}
+    type Dot = {x: Int, y: Int}
+
+    type Shape = <rect: Rect, ellipse: Ellipse, dot: Dot>
+
+    def on () String = "*"
+    def off() String = ""
+
+    def con(a : String, b : String) String = Strings.concat(a, b)
+
+    def repeat(s: String, i: Int) String = 
+        Ints.lte(i, 0) match {
+            case True(_) => ""
+            case False(_) => con(s, repeat(s, Ints.sub(i,1)))
+        }
+
+    val emptyLine = con(repeat(" ", 79), "\n")
+
+    def emptyLines(x : Int) String = repeat(emptyLine, x)
+
+    // existing
+    def renderShape(s: Shape) String =
+        s match {
+            case dot({x, y})  =>  con(con(emptyLines(y), repeat(" ", x)), "*")
+            case rect({x, y, w, h}) =>  
+                con(
+                    con(
+                        con(
+                            con(
+                                con(
+                                    con(
+                                        con(
+                                            emptyLines(y), 
+                                            repeat(" ", x)
+                                        ), 
+                                        repeat("*", w)
+                                    ), 
+                                    "\n"
+                                ), 
+                                repeat(
+                                    con(
+                                        con(
+                                            con(
+                                                repeat(" ", x), 
+                                                "*"
+                                            ), 
+                                            repeat(" ", Ints.sub(w, 2)) 
+                                        ), 
+                                        "*\n"
+                                    ), 
+                                    Ints.sub(h, 2)
+                                )
+                            ), 
+                            repeat(" ", x)
+                        ), 
+                        repeat("*", w)
+                    ), 
+                    "\n"
+                )
+            case ellipse(_) => "this is an ellipse right here yep"
+        }
+
+    
+    val out : String = con(con(renderShape(<dot = {x=8,y=8}>), "\n"), renderShape(<rect = {x = 0, y = 0, w = 5, h = 5}>))
+    w.write(out)
+}
+
+
+
+
+
+

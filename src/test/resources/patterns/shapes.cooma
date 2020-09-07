@@ -30,43 +30,81 @@ fun (w : Writer) {
     def renderShape(s: Shape) String =
         s match {
             case dot(pt)  =>  con(con(emptyLines(pt.y), repeat(" ", pt.x)), "*")
-            case rect(details) =>  
+            case rect(details) => renderRect(details)
+            case ellipse(e) => renderEllipse(e)
+        }
+
+    def renderRect(r : Rect) String = 
+        con(
+            con(
                 con(
                     con(
                         con(
                             con(
                                 con(
-                                    con(
-                                        con(
-                                            emptyLines(details.y), 
-                                            repeat(" ", details.x)
-                                        ), 
-                                        repeat("*", details.w)
-                                    ), 
-                                    "\n"
+                                    emptyLines(r.y), 
+                                    repeat(" ", r.x)
                                 ), 
-                                repeat(
-                                    con(
-                                        con(
-                                            con(
-                                                repeat(" ", details.x), 
-                                                "*"
-                                            ), 
-                                            repeat(" ", Ints.sub(details.w, 2)) 
-                                        ), 
-                                        "*\n"
-                                    ), 
-                                    Ints.sub(details.h, 2)
-                                )
+                                repeat("*", r.w)
                             ), 
-                            repeat(" ", details.x)
+                            "\n"
                         ), 
-                        repeat("*", details.w)
+                        repeat(
+                            con(
+                                con(
+                                    con(
+                                        repeat(" ", r.x), 
+                                        "*"
+                                    ), 
+                                    repeat(" ", Ints.sub(r.w, 2)) 
+                                ), 
+                                "*\n"
+                            ), 
+                            Ints.sub(r.h, 2)
+                        )
                     ), 
-                    "\n"
-                )
-            case ellipse(_) => "this is an ellipse right here yep"
-        }
+                    repeat(" ", r.x)
+                ), 
+                repeat("*", r.w)
+            ), 
+            "\n"
+        )
+
+    def renderEllipse(e : Ellipse) String = 
+        con(
+            con(
+                con(
+                    con(
+                        con(
+                            con(
+                                con(
+                                    emptyLines(e.y), 
+                                    repeat(" ", Ints.add(e.x, 1))
+                                ), 
+                                repeat("*", Ints.sub(e.w, 1))
+                            ), 
+                            "\n"
+                        ), 
+                        repeat(
+                            con(
+                                con(
+                                    con(
+                                        repeat(" ", e.x), 
+                                        "*"
+                                    ), 
+                                    repeat(" ", Ints.sub(e.w, 2)) 
+                                ), 
+                                "*\n"
+                            ), 
+                            Ints.sub(e.h, 2)
+                        )
+                    ), 
+                    repeat(" ", Ints.add(e.x, 1))
+                ), 
+                repeat("*", Ints.sub(e.w, 1))
+            ), 
+            "\n"
+        )
 
     // target
     //def renderShape(s: Shape) String =
@@ -76,8 +114,13 @@ fun (w : Writer) {
     //        case circ(details) => "circle"
     //        case rect(details) => "rectangle"
     //    }
+
+    val rectangle : String = renderShape(<rect = {x = 0, y = 0, w = 5, h = 5}>)
+    val ellipse : String = renderShape(<ellipse = {x = 0, y = 0, w = 8, h = 5}>)
+    val dot : String = renderShape(<dot = {x = 8, y = 8}>)
+    val nl : String = "\n"
     
-    val out : String = con(con(renderShape(<dot = {x=8,y=8}>), "\n"), renderShape(<rect = {x = 0, y = 0, w = 5, h = 5}>))
+    val out : String = con(con(con(con(dot, nl), rectangle), nl), ellipse)
     w.write(out)
 }
 
