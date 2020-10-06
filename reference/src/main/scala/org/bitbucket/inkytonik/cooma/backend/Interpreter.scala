@@ -115,7 +115,31 @@ class Interpreter(config : Config) {
                                     }
 
                                 case None =>
-                                    //sys.error(s"interpret CasV: can't find case for variant $c1")
+                                    lookupC(rho, d) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $d is $v")
+                                    }
+                            }
+
+                        case v @ (IntR(_) | RecR(_) | StrR(_)) =>
+                            val optK =
+                                cs.collectFirst {
+                                    case SCaseTerm(k) => k
+                                }
+                            optK match {
+                                case Some(k) =>
+                                    lookupC(rho, k) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $k is $v")
+                                    }
+
+                                case None =>
                                     lookupC(rho, d) match {
                                         case ClsC(rho2, y, t) =>
                                             interpretAux(ConsVE(rho2, y, v), t)
