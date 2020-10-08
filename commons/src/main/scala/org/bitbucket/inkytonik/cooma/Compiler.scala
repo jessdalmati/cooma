@@ -396,13 +396,16 @@ trait Compiler {
 
         val vi = fresh("v")
 
-        val ncs = css.map {
-            case Case(SPtrn(IdnDef(idn)) +: t, e) => Case(t, substVar(e, idn, vi))
-        }
+        // val ncs = css.map {
+        //     case Case(SPtrn(IdnDef(idn)) +: t, e) => Case(t, substVar(e, idn, vi))
+        // }
 
         val cks = es match {
             case h +: t =>
-                ((SPtrn(IdnDef(vi)), Mat(h, t, ncs, d)), fresh("k"))
+                ((SPtrn(IdnDef(vi)), Mat(h, t, css.map {
+                    case Case(SPtrn(IdnDef(idn)) +: t, e) =>
+                        Case(t, substVar(e, idn, vi))
+                }, d)), fresh("k"))
             case _ => css(0) match {
                 case Case(p +: _, expr) =>
                     ((p, expr), fresh("k"))
@@ -679,13 +682,16 @@ trait Compiler {
 
         val vi = fresh("v")
 
-        val ncs = css.map {
-            case Case(SPtrn(IdnDef(idn)) +: t, e) => Case(t, substVar(e, idn, vi))
-        }
+        // val ncs = css.map {
+        //     case Case(SPtrn(IdnDef(idn)) +: t, e) => Case(t, substVar(e, idn, vi))
+        // }
 
         val cks = es match {
             case h +: t =>
-                ((SPtrn(IdnDef(vi)), Mat(h, t, ncs, d)), fresh("k"))
+                ((SPtrn(IdnDef(vi)), Mat(h, t, css.map {
+                    case Case(SPtrn(IdnDef(idn)) +: t, e) =>
+                        Case(t, substVar(e, idn, vi))
+                }, d)), fresh("k"))
             case _ => css(0) match {
                 case Case(p +: _, expr) =>
                     ((p, expr), fresh("k"))

@@ -127,7 +127,8 @@ class Interpreter(config : Config) {
                         case v @ (IntR(_) | RecR(_) | StrR(_)) =>
                             val optK =
                                 cs.collectFirst {
-                                    case SCaseTerm(k) => k
+                                    case SCaseTerm(k)    => k
+                                    case VCaseTerm(_, k) => k
                                 }
                             optK match {
                                 case Some(k) =>
