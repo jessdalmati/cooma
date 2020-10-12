@@ -59,8 +59,12 @@ Case =
   \n "case" Pattern ++ ',' '=>' nestnl(Expression).
 
 Pattern = 
-    Identifier '(' Pattern ")" {VPtrn}
-  | IdnDef                     {SPtrn}.
+    '{' FPtrn (',' FPtrn)* "}"  {RPtrnLit}
+  | Identifier '(' Pattern ")"  {VPtrn}
+  | IdnDef                      {SPtrn}.
+
+FPtrn = 
+  Identifier '=' Pattern.
 
 Default = 
     \n "case" "$" '=>' nestnl(Expression) {Dflt}

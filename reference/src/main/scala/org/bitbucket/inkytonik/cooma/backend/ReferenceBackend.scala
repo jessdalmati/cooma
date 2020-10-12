@@ -50,6 +50,7 @@ class ReferenceBackend(
     sealed abstract class CaseTerm
     case class VCaseTerm(c : String, k : String) extends CaseTerm
     case class SCaseTerm(k : String) extends CaseTerm
+    case class RCaseTerm(c : String, k : String) extends CaseTerm
 
     case class DefTerm(f : String, k : String, x : String, body : Term)
 
@@ -82,6 +83,9 @@ class ReferenceBackend(
 
     def sCaseTerm(k : String) : CaseTerm =
         SCaseTerm(k)
+
+    def rCaseTerm(c : String, k : String) : CaseTerm =
+        RCaseTerm(c, k)
 
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         DefTerm(f, k, x, body)
@@ -239,6 +243,7 @@ class ReferenceBackend(
     def toDocCaseTerm(caseTerm : CaseTerm) : Doc =
         caseTerm match {
             case VCaseTerm(c, k) => '(' <> value(c) <+> value(k) <> ')'
+            case RCaseTerm(c, k) => '(' <> value(c) <+> value(k) <> ')'
             case SCaseTerm(k)    => '(' <> value(k) <> ')'
         }
 
