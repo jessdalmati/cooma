@@ -484,6 +484,14 @@ trait Compiler {
 
     }
 
+    def shrinkRec(exp : Expression, idn : String) : Expression = {
+        exp match {
+            case Rec(fields) => Rec(fields.filterNot(f => f.identifier == idn))
+            case Uni()       => Rec(Vector())
+            case _           => sys.error("something has gone horribly wrong...")
+        }
+    }
+
     def compileCaseRec(e : Expression, es : Vector[Expression], css : Vector[Case],
         d : Default, kappa : String => Term) : Term = {
 
@@ -493,6 +501,7 @@ trait Compiler {
             case Case(RPtrnLit(FPtrn(name, _), flds) +: _, _) => name +: flds.map {
                 case FPtrn(name, _) => name
             }
+            case Case(RPtrnE() +: _, _) => Vector()
         }
 
         //new constructor cases with fresh variables
@@ -504,28 +513,36 @@ trait Compiler {
                 Case(
                     Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(vi))), Vector())),
                     Mat(
-                        Idn(IdnUse(vi)),
-                        t match {
-                            case h +: t => e +: es
-                            case _      => es
-                        },
+                        shrinkRec(e, cons), Idn(IdnUse(vi)) +: es,
                         cs.map {
-                            case Case(RPtrnLit(FPtrn(_, SPtrn(IdnDef(xi))), flds) +: t, expr) => flds match {
-                                case f +: fs =>
-                                    Case(SPtrn(IdnDef(cons)) +: RPtrnLit(f, fs) +: t, substRec(expr, xi, cons, e))
-                                case _ =>
-                                    Case(SPtrn(IdnDef(cons)) +: t, substRec(expr, xi, cons, e))
-                            }
                             case Case(RPtrnLit(FPtrn(_, sp), flds) +: t, expr) => flds match {
                                 case f +: fs =>
-                                    Case(sp +: RPtrnLit(f, fs) +: t, expr)
+                                    Case(RPtrnLit(f, fs) +: sp +: t, expr)
                                 case _ =>
-                                    Case(sp +: t, expr)
+                                    Case(RPtrnE() +: sp +: t, expr)
                             }
                         },
                         d
                     )
                 )
+            }
+            case (_, cs) => {
+                es match {
+                    case h +: t => Case(
+                        Vector(RPtrnE()),
+                        Mat(
+                            h, t,
+                            cs.map {
+                                case Case(RPtrnE() +: t, expr) =>
+                                    Case(t, expr)
+                            },
+                            d
+                        )
+                    )
+                    case _ => cs(0) match {
+                        case Case(RPtrnE() +: _, expr) => Case(Vector(RPtrnE()), expr)
+                    }
+                }
             }
         }
 
@@ -535,6 +552,7 @@ trait Compiler {
 
         val caseTerms = cks.map {
             case (Case(RPtrnLit(FPtrn(name, _), _) +: t, _), k) => rCaseTerm(name, k)
+            case (Case(RPtrnE() +: t, _), k)                    => eCaseTerm(k)
         }.toVector
 
         compile(e, z => cks.foldLeft(letC(dk, z, d match {
@@ -543,6 +561,8 @@ trait Compiler {
         }, casV(z, caseTerms, dk))) {
             case (t, (Case(RPtrnLit(FPtrn(_, SPtrn(IdnDef(xi))), _) +: _, ei), ki)) =>
                 letC(ki, xi, compile(ei, zi => kappa(zi)), t)
+            case (t, (Case(RPtrnE() +: _, ei), ki)) =>
+                letC(ki, fresh("v"), compile(ei, zi => kappa(zi)), t)
         })
 
     }
@@ -586,6 +606,8 @@ trait Compiler {
             case Case(VPtrn(_, _) +: _, _) +: _ =>
                 compileCase_3(e, es, css, nd, kappa)
             case Case(RPtrnLit(_, _) +: _, _) +: _ =>
+                compileCaseRec(e, es, css, nd, kappa)
+            case Case(RPtrnE() +: _, _) +: _ =>
                 compileCaseRec(e, es, css, nd, kappa)
         }
     }
@@ -840,6 +862,7 @@ trait Compiler {
             case Case(RPtrnLit(FPtrn(name, _), flds) +: _, _) => name +: flds.map {
                 case FPtrn(name, _) => name
             }
+            case Case(RPtrnE() +: _, _) => Vector()
         }
 
         //new constructor cases with fresh variables
@@ -851,28 +874,36 @@ trait Compiler {
                 Case(
                     Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(vi))), Vector())),
                     Mat(
-                        Idn(IdnUse(vi)),
-                        t match {
-                            case h +: t => e +: es
-                            case _      => es
-                        },
+                        shrinkRec(e, cons), Idn(IdnUse(vi)) +: es,
                         cs.map {
-                            case Case(RPtrnLit(FPtrn(_, SPtrn(IdnDef(xi))), flds) +: t, expr) => flds match {
-                                case f +: fs =>
-                                    Case(SPtrn(IdnDef(cons)) +: RPtrnLit(f, fs) +: t, substRec(expr, xi, cons, e))
-                                case _ =>
-                                    Case(SPtrn(IdnDef(cons)) +: t, substRec(expr, xi, cons, e))
-                            }
                             case Case(RPtrnLit(FPtrn(_, sp), flds) +: t, expr) => flds match {
                                 case f +: fs =>
-                                    Case(sp +: RPtrnLit(f, fs) +: t, expr)
+                                    Case(RPtrnLit(f, fs) +: sp +: t, expr)
                                 case _ =>
-                                    Case(sp +: t, expr)
+                                    Case(RPtrnE() +: sp +: t, expr)
                             }
                         },
                         d
                     )
                 )
+            }
+            case (_, cs) => {
+                es match {
+                    case h +: t => Case(
+                        Vector(RPtrnE()),
+                        Mat(
+                            h, t,
+                            cs.map {
+                                case Case(RPtrnE() +: t, expr) =>
+                                    Case(t, expr)
+                            },
+                            d
+                        )
+                    )
+                    case _ => cs(0) match {
+                        case Case(RPtrnE() +: _, expr) => Case(Vector(RPtrnE()), expr)
+                    }
+                }
             }
         }
 
@@ -882,6 +913,7 @@ trait Compiler {
 
         val caseTerms = cks.map {
             case (Case(RPtrnLit(FPtrn(name, _), _) +: t, _), k) => rCaseTerm(name, k)
+            case (Case(RPtrnE() +: t, _), k)                    => eCaseTerm(k)
         }.toVector
 
         compile(e, z => cks.foldLeft(letC(dk, z, d match {
@@ -890,6 +922,8 @@ trait Compiler {
         }, casV(z, caseTerms, dk))) {
             case (t, (Case(RPtrnLit(FPtrn(_, SPtrn(IdnDef(xi))), _) +: _, ei), ki)) =>
                 letC(ki, xi, tailCompile(ei, k), t)
+            case (t, (Case(RPtrnE() +: _, ei), ki)) =>
+                letC(ki, fresh("v"), tailCompile(ei, k), t)
         })
 
     }
