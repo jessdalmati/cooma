@@ -530,6 +530,44 @@ trait Compiler {
         })
     }
 
+    def compileCaseStr(e : Expression, es : Vector[Expression], css : Vector[Case],
+        d : Default, kappa : String => Term) : Term = {
+
+        val grouped = css.groupBy {
+            case Case(StrPtrn(str) +: _, _) => str
+        }
+
+        val newCases = grouped.map {
+            case (cons, cs) => es match {
+                case h +: t =>
+                    Case(
+                        Vector(StrPtrn(cons)),
+                        Mat(h, t, cs.map {
+                            case Case(StrPtrn(_) +: t, expr) =>
+                                Case(t, expr)
+                        }, d)
+                    )
+                case _ => cs(0)
+            }
+        }
+
+        val dk = fresh("k")
+
+        val cks = newCases.map(c => (c, fresh("k")))
+
+        val caseTerms = cks.map {
+            case (Case(StrPtrn(str) +: _, _), k) => strCaseTerm(str, k)
+        }.toVector
+
+        compile(e, z => cks.foldLeft(letC(dk, z, d match {
+            case Dflt(d)  => compile(d, zi => kappa(zi))
+            case NoDflt() => compileHalt(Num(-1))
+        }, casV(z, caseTerms, dk))) {
+            case (t, (Case(StrPtrn(str) +: _, ei), ki)) =>
+                letC(ki, fresh("v"), compile(ei, zi => kappa(zi)), t)
+        })
+    }
+
     def compileCaseRec(e : Expression, es : Vector[Expression], css : Vector[Case],
         d : Default, kappa : String => Term) : Term = {
 
@@ -669,6 +707,8 @@ trait Compiler {
                 compileCaseRec(e, es, css, nd, kappa)
             case Case(IPtrn(_) +: _, _) +: _ =>
                 compileCaseInt(e, es, css, nd, kappa)
+            case Case(StrPtrn(_) +: _, _) +: _ =>
+                compileCaseStr(e, es, css, nd, kappa)
         }
     }
 

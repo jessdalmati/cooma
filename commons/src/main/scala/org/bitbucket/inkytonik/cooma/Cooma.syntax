@@ -64,7 +64,11 @@ Pattern =
   | '{' '{' FieldPattern (',' FieldPattern)* "}" '&' IdnDef "}"  {RPtrnCons}
   | Identifier '(' Pattern ")"                                   {VPtrn}
   | IdnDef                                                       {SPtrn}
-  | IntLit                                                       {IPtrn, 1: BigInt.apply : BigInt}.
+  | IntLit                                                       {IPtrn, 1: BigInt.apply : BigInt}
+  | '"' SPLit '"'                                                {StrPtrn}.
+
+SPLit : Token = 
+  StringChar*.
 
 FieldPattern = 
     Identifier '=' Pattern  {FPtrn}

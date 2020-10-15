@@ -102,10 +102,11 @@ class Interpreter(config : Config) {
                                 cs.collectFirst {
                                     case VCaseTerm(c2, k) if c1 == c2 =>
                                         k
-                                    case SCaseTerm(k)    => k
-                                    case ECaseTerm(k)    => k
-                                    case RCaseTerm(_, k) => k
-                                    case ICaseTerm(_, k) => k
+                                    case SCaseTerm(k)      => k
+                                    case ECaseTerm(k)      => k
+                                    case RCaseTerm(_, k)   => k
+                                    case ICaseTerm(_, k)   => k
+                                    case STRCaseTerm(_, k) => k
                                 }
                             optK match {
                                 case Some(k) =>
@@ -134,9 +135,10 @@ class Interpreter(config : Config) {
                                         (rs(rs.indexWhere(fld => c == fld.x)).v, k)
                                     case ECaseTerm(k) if rs.isEmpty =>
                                         (v, k)
-                                    case VCaseTerm(_, k) => (v, k)
-                                    case SCaseTerm(k)    => (v, k)
-                                    case ICaseTerm(_, k) => (v, k)
+                                    case VCaseTerm(_, k)   => (v, k)
+                                    case SCaseTerm(k)      => (v, k)
+                                    case ICaseTerm(_, k)   => (v, k)
+                                    case STRCaseTerm(_, k) => (v, k)
                                 }
                             optK match {
                                 case Some((v, k)) =>
@@ -166,6 +168,7 @@ class Interpreter(config : Config) {
                                     case ECaseTerm(k)                 => k
                                     case VCaseTerm(_, k)              => k
                                     case RCaseTerm(_, k)              => k
+                                    case STRCaseTerm(_, k)            => k
                                 }
                             optK match {
                                 case Some(k) =>
@@ -187,14 +190,15 @@ class Interpreter(config : Config) {
                                     }
                             }
 
-                        case v @ StrR(_) =>
+                        case v @ StrR(s1) =>
                             val optK =
                                 cs.collectFirst {
-                                    case SCaseTerm(k)    => k
-                                    case ECaseTerm(k)    => k
-                                    case VCaseTerm(_, k) => k
-                                    case RCaseTerm(_, k) => k
-                                    case ICaseTerm(_, k) => k
+                                    case STRCaseTerm(s2, k) if s1 == s2 => k
+                                    case SCaseTerm(k)                   => k
+                                    case ECaseTerm(k)                   => k
+                                    case VCaseTerm(_, k)                => k
+                                    case RCaseTerm(_, k)                => k
+                                    case ICaseTerm(_, k)                => k
                                 }
                             optK match {
                                 case Some(k) =>

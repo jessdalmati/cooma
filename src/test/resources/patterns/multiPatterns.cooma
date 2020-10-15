@@ -1,8 +1,6 @@
 {
 	true, false match {
-		case x, False(_) => 1
-		case True(_), y => 2
-		case x, False(_) => 3
-		case x, True(_) => 4
+		case True(a), False(b) => a
+		case _, _ => {x = 1}
 	}
 }
