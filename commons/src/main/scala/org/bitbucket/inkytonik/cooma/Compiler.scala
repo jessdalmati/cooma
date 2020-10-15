@@ -498,8 +498,12 @@ trait Compiler {
         //stable sort
         //map of constructor type to cases with the first pattern of that type
         val grouped = css.groupBy {
-            case Case(RPtrnLit(FPtrn(name, _), flds) +: _, _) => name +: flds.map {
-                case FPtrn(name, _) => name
+            case Case(RPtrnLit(p, ps) +: _, _) => (p match {
+                case FPtrn(lb, _) => lb
+                case LPtrn(lb)    => lb
+            }) +: ps.map {
+                case FPtrn(lb, _) => lb
+                case LPtrn(lb)    => lb
             }
             case Case(RPtrnE() +: _, _) => Vector()
         }
@@ -509,17 +513,23 @@ trait Compiler {
         //first pattern removed and also subpatterns placed at the head
         val newCases = grouped.map {
             case (cons +: t, cs) => {
-                val vi = fresh("v")
+                //val vi = fresh("v")
                 Case(
-                    Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(vi))), Vector())),
+                    Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(cons))), Vector())),
                     Mat(
-                        shrinkRec(e, cons), Idn(IdnUse(vi)) +: es,
+                        shrinkRec(e, cons), Idn(IdnUse(cons)) +: es,
                         cs.map {
-                            case Case(RPtrnLit(FPtrn(_, sp), flds) +: t, expr) => flds match {
-                                case f +: fs =>
-                                    Case(RPtrnLit(f, fs) +: sp +: t, expr)
-                                case _ =>
-                                    Case(RPtrnE() +: sp +: t, expr)
+                            case Case(RPtrnLit(p, ps) +: t, expr) => {
+                                ps match {
+                                    case f +: fs => p match {
+                                        case FPtrn(_, sp) => Case(RPtrnLit(f, fs) +: sp +: t, expr)
+                                        case LPtrn(cons)  => Case(RPtrnLit(f, fs) +: SPtrn(IdnDef(cons)) +: t, expr)
+                                    }
+                                    case _ => p match {
+                                        case FPtrn(_, sp) => Case(RPtrnE() +: sp +: t, expr)
+                                        case LPtrn(cons)  => Case(RPtrnE() +: SPtrn(IdnDef(cons)) +: t, expr)
+                                    }
+                                }
                             }
                         },
                         d
@@ -859,8 +869,12 @@ trait Compiler {
         //stable sort
         //map of constructor type to cases with the first pattern of that type
         val grouped = css.groupBy {
-            case Case(RPtrnLit(FPtrn(name, _), flds) +: _, _) => name +: flds.map {
-                case FPtrn(name, _) => name
+            case Case(RPtrnLit(p, ps) +: _, _) => (p match {
+                case FPtrn(lb, _) => lb
+                case LPtrn(lb)    => lb
+            }) +: ps.map {
+                case FPtrn(lb, _) => lb
+                case LPtrn(lb)    => lb
             }
             case Case(RPtrnE() +: _, _) => Vector()
         }
@@ -870,17 +884,23 @@ trait Compiler {
         //first pattern removed and also subpatterns placed at the head
         val newCases = grouped.map {
             case (cons +: t, cs) => {
-                val vi = fresh("v")
+                //val vi = fresh("v")
                 Case(
-                    Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(vi))), Vector())),
+                    Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(cons))), Vector())),
                     Mat(
-                        shrinkRec(e, cons), Idn(IdnUse(vi)) +: es,
+                        shrinkRec(e, cons), Idn(IdnUse(cons)) +: es,
                         cs.map {
-                            case Case(RPtrnLit(FPtrn(_, sp), flds) +: t, expr) => flds match {
-                                case f +: fs =>
-                                    Case(RPtrnLit(f, fs) +: sp +: t, expr)
-                                case _ =>
-                                    Case(RPtrnE() +: sp +: t, expr)
+                            case Case(RPtrnLit(p, ps) +: t, expr) => {
+                                ps match {
+                                    case f +: fs => p match {
+                                        case FPtrn(_, sp) => Case(RPtrnLit(f, fs) +: sp +: t, expr)
+                                        case LPtrn(cons)  => Case(RPtrnLit(f, fs) +: SPtrn(IdnDef(cons)) +: t, expr)
+                                    }
+                                    case _ => p match {
+                                        case FPtrn(_, sp) => Case(RPtrnE() +: sp +: t, expr)
+                                        case LPtrn(cons)  => Case(RPtrnE() +: SPtrn(IdnDef(cons)) +: t, expr)
+                                    }
+                                }
                             }
                         },
                         d
