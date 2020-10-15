@@ -52,6 +52,7 @@ class ReferenceBackend(
     case class SCaseTerm(k : String) extends CaseTerm
     case class RCaseTerm(c : String, k : String) extends CaseTerm
     case class ECaseTerm(k : String) extends CaseTerm
+    case class ICaseTerm(n : BigInt, k : String) extends CaseTerm
 
     case class DefTerm(f : String, k : String, x : String, body : Term)
 
@@ -90,6 +91,9 @@ class ReferenceBackend(
 
     def rCaseTerm(c : String, k : String) : CaseTerm =
         RCaseTerm(c, k)
+
+    def iCaseTerm(n : BigInt, k : String) : CaseTerm =
+        ICaseTerm(n, k)
 
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         DefTerm(f, k, x, body)
@@ -250,6 +254,7 @@ class ReferenceBackend(
             case RCaseTerm(c, k) => '(' <> value(c) <+> value(k) <> ')'
             case SCaseTerm(k)    => '(' <> value(k) <> ')'
             case ECaseTerm(k)    => '(' <> value(k) <> ')'
+            case ICaseTerm(n, k) => '(' <> n.toString <+> value(k) <> ')'
         }
 
     def toDocDefTerm(defTerm : DefTerm) : Doc =

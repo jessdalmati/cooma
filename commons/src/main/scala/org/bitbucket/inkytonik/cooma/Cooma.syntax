@@ -63,7 +63,8 @@ Pattern =
   | '{' FieldPattern (',' FieldPattern)* "}"                     {RPtrnLit}
   | '{' '{' FieldPattern (',' FieldPattern)* "}" '&' IdnDef "}"  {RPtrnCons}
   | Identifier '(' Pattern ")"                                   {VPtrn}
-  | IdnDef                                                       {SPtrn}.
+  | IdnDef                                                       {SPtrn}
+  | IntLit                                                       {IPtrn, 1: BigInt.apply : BigInt}.
 
 FieldPattern = 
     Identifier '=' Pattern  {FPtrn}

@@ -492,6 +492,44 @@ trait Compiler {
         }
     }
 
+    def compileCaseInt(e : Expression, es : Vector[Expression], css : Vector[Case],
+        d : Default, kappa : String => Term) : Term = {
+
+        val grouped = css.groupBy {
+            case Case(IPtrn(n) +: _, _) => n
+        }
+
+        val newCases = grouped.map {
+            case (cons, cs) => es match {
+                case h +: t =>
+                    Case(
+                        Vector(IPtrn(cons)),
+                        Mat(h, t, cs.map {
+                            case Case(IPtrn(_) +: t, expr) =>
+                                Case(t, expr)
+                        }, d)
+                    )
+                case _ => cs(0)
+            }
+        }
+
+        val dk = fresh("k")
+
+        val cks = newCases.map(c => (c, fresh("k")))
+
+        val caseTerms = cks.map {
+            case (Case(IPtrn(n) +: _, _), k) => iCaseTerm(n, k)
+        }.toVector
+
+        compile(e, z => cks.foldLeft(letC(dk, z, d match {
+            case Dflt(d)  => compile(d, zi => kappa(zi))
+            case NoDflt() => compileHalt(Num(-1))
+        }, casV(z, caseTerms, dk))) {
+            case (t, (Case(IPtrn(n) +: _, ei), ki)) =>
+                letC(ki, fresh("v"), compile(ei, zi => kappa(zi)), t)
+        })
+    }
+
     def compileCaseRec(e : Expression, es : Vector[Expression], css : Vector[Case],
         d : Default, kappa : String => Term) : Term = {
 
@@ -563,9 +601,7 @@ trait Compiler {
                             d
                         )
                     )
-                    case _ => cs(0) match {
-                        case Case(RPtrnE() +: _, expr) => Case(Vector(RPtrnE()), expr)
-                    }
+                    case _ => cs(0)
                 }
             }
         }
@@ -631,6 +667,8 @@ trait Compiler {
                 compileCase_3(e, es, css, nd, kappa)
             case Case(r @ (RPtrnLit(_, _) | RPtrnCons(_, _, _) | RPtrnE()) +: _, _) +: _ =>
                 compileCaseRec(e, es, css, nd, kappa)
+            case Case(IPtrn(_) +: _, _) +: _ =>
+                compileCaseInt(e, es, css, nd, kappa)
         }
     }
 

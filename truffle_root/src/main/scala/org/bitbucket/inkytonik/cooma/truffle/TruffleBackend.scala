@@ -57,6 +57,9 @@ class TruffleBackend(config : Config) extends Backend {
     def rCaseTerm(c : String, k : String) : CaseTerm =
         new CoomaCaseTerm(c, k)
 
+    def iCaseTerm(n : BigInt, k : String) : CaseTerm =
+        new CoomaCaseTerm("", k)
+
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         new CoomaDefTerm(f, k, x, body)
 
