@@ -59,14 +59,15 @@ Case =
   \n "case" Pattern ++ ',' '=>' nestnl(Expression).
 
 Pattern = 
-    '{' '}'                                   {RPtrnE}
-  | '{' FieldPattern (',' FieldPattern)* "}"  {RPtrnLit}
-  | Identifier '(' Pattern ")"                {VPtrn}
-  | IdnDef                                    {SPtrn}.
+    '{' '}'                                                      {RPtrnE}
+  | '{' FieldPattern (',' FieldPattern)* "}"                     {RPtrnLit}
+  | '{' '{' FieldPattern (',' FieldPattern)* "}" '&' IdnDef "}"  {RPtrnCons}
+  | Identifier '(' Pattern ")"                                   {VPtrn}
+  | IdnDef                                                       {SPtrn}.
 
 FieldPattern = 
     Identifier '=' Pattern  {FPtrn}
-  | Identifier               {LPtrn}.
+  | Identifier              {LPtrn}.
 
 Default = 
     \n "case" "$" '=>' nestnl(Expression) {Dflt}

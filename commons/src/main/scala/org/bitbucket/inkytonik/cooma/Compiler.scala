@@ -505,6 +505,13 @@ trait Compiler {
                 case FPtrn(lb, _) => lb
                 case LPtrn(lb)    => lb
             }
+            case Case(RPtrnCons(p, ps, _) +: _, _) => (p match {
+                case FPtrn(lb, _) => lb
+                case LPtrn(lb)    => lb
+            }) +: ps.map {
+                case FPtrn(lb, _) => lb
+                case LPtrn(lb)    => lb
+            }
             case Case(RPtrnE() +: _, _) => Vector()
         }
 
@@ -513,22 +520,29 @@ trait Compiler {
         //first pattern removed and also subpatterns placed at the head
         val newCases = grouped.map {
             case (cons +: t, cs) => {
-                //val vi = fresh("v")
                 Case(
                     Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(cons))), Vector())),
                     Mat(
                         shrinkRec(e, cons), Idn(IdnUse(cons)) +: es,
                         cs.map {
-                            case Case(RPtrnLit(p, ps) +: t, expr) => {
-                                ps match {
-                                    case f +: fs => p match {
-                                        case FPtrn(_, sp) => Case(RPtrnLit(f, fs) +: sp +: t, expr)
-                                        case LPtrn(cons)  => Case(RPtrnLit(f, fs) +: SPtrn(IdnDef(cons)) +: t, expr)
-                                    }
-                                    case _ => p match {
-                                        case FPtrn(_, sp) => Case(RPtrnE() +: sp +: t, expr)
-                                        case LPtrn(cons)  => Case(RPtrnE() +: SPtrn(IdnDef(cons)) +: t, expr)
-                                    }
+                            case Case(RPtrnLit(p, ps) +: t, expr) => ps match {
+                                case f +: fs => p match {
+                                    case FPtrn(_, sp) => Case(RPtrnLit(f, fs) +: sp +: t, expr)
+                                    case LPtrn(cons)  => Case(RPtrnLit(f, fs) +: SPtrn(IdnDef(cons)) +: t, expr)
+                                }
+                                case _ => p match {
+                                    case FPtrn(_, sp) => Case(RPtrnE() +: sp +: t, expr)
+                                    case LPtrn(cons)  => Case(RPtrnE() +: SPtrn(IdnDef(cons)) +: t, expr)
+                                }
+                            }
+                            case Case(RPtrnCons(p, ps, idn) +: t, expr) => ps match {
+                                case f +: fs => p match {
+                                    case FPtrn(_, sp) => Case(RPtrnCons(f, fs, idn) +: sp +: t, expr)
+                                    case LPtrn(cons)  => Case(RPtrnCons(f, fs, idn) +: SPtrn(IdnDef(cons)) +: t, expr)
+                                }
+                                case _ => p match {
+                                    case FPtrn(_, sp) => Case(SPtrn(idn) +: sp +: t, expr)
+                                    case LPtrn(cons)  => Case(SPtrn(idn) +: SPtrn(IdnDef(cons)) +: t, expr)
                                 }
                             }
                         },
@@ -561,8 +575,8 @@ trait Compiler {
         val cks = newCases.map(c => (c, fresh("k")))
 
         val caseTerms = cks.map {
-            case (Case(RPtrnLit(FPtrn(name, _), _) +: t, _), k) => rCaseTerm(name, k)
-            case (Case(RPtrnE() +: t, _), k)                    => eCaseTerm(k)
+            case (Case(RPtrnLit(FPtrn(name, _), _) +: _, _), k) => rCaseTerm(name, k)
+            case (Case(RPtrnE() +: _, _), k)                    => eCaseTerm(k)
         }.toVector
 
         compile(e, z => cks.foldLeft(letC(dk, z, d match {
@@ -615,9 +629,7 @@ trait Compiler {
                 compileCase_2(e, es, css, nd, kappa)
             case Case(VPtrn(_, _) +: _, _) +: _ =>
                 compileCase_3(e, es, css, nd, kappa)
-            case Case(RPtrnLit(_, _) +: _, _) +: _ =>
-                compileCaseRec(e, es, css, nd, kappa)
-            case Case(RPtrnE() +: _, _) +: _ =>
+            case Case(r @ (RPtrnLit(_, _) | RPtrnCons(_, _, _) | RPtrnE()) +: _, _) +: _ =>
                 compileCaseRec(e, es, css, nd, kappa)
         }
     }
