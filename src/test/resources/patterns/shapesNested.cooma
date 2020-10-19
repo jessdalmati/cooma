@@ -1,4 +1,4 @@
-fun (w : Writer) {
+fun (writer : Writer) {
     type RGB = {r: Int, g: Int, b: Int}
     type HSB = {h: Int, s: Int, b: Int}
 
@@ -67,10 +67,9 @@ fun (w : Writer) {
                 )
             case ellipse(_) => "this is an ellipse right here yep"
         }
-
     
     val out : String = con(con(renderShape(<dot = {x=8,y=8}>), "\n"), renderShape(<rect = {x = 0, y = 0, w = 5, h = 5}>))
-    w.write(out)
+    writer.write(out)
 }
 
 
