@@ -61,7 +61,7 @@ Case =
 Pattern = 
     '{' '}'                                                      {RPtrnE}
   | '{' FieldPattern (',' FieldPattern)* "}"                     {RPtrnLit}
-  | '{' '{' FieldPattern (',' FieldPattern)* "}" '&' IdnDef "}"  {RPtrnCons}
+//  | '{' RecConsLit '&' IdnDef "}"                                {RPtrnCons}
   | Identifier '(' Pattern ")"                                   {VPtrn}
   | IdnDef                                                       {SPtrn}
   | IntLit                                                       {IPtrn, 1: BigInt.apply : BigInt}
@@ -69,6 +69,9 @@ Pattern =
 
 SPLit : Token = 
   StringChar*.
+
+RecConsLit = 
+  '{' FieldPattern (',' FieldPattern)* "}".
 
 FieldPattern = 
     Identifier '=' Pattern  {FPtrn}

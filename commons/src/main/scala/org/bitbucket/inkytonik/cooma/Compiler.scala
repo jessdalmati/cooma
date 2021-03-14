@@ -12,12 +12,17 @@ trait Compiler {
     import org.bitbucket.inkytonik.kiama.relation._
     import org.bitbucket.inkytonik.cooma.SymbolTable._
 
+    var program : Tree[ASTNode, ASTNode] = new Tree(Program(Uni()))
+    var semanticAnalyser : SemanticAnalyser = new SemanticAnalyser(program)
+
     /**
      * Compile a program that will run as a command with
      * user-supplied command-line arguments.
      */
     def compileCommand(prog : Program) : Term = {
         resetFresh()
+        program = new Tree(prog)
+        semanticAnalyser = new SemanticAnalyser(program)
         compileTop(prog.expression, 0)
     }
 
@@ -27,6 +32,8 @@ trait Compiler {
      */
     def compileStandalone(prog : Program) : Term = {
         resetFresh()
+        program = new Tree(prog)
+        semanticAnalyser = new SemanticAnalyser(program)
         compileHalt(prog.expression)
     }
 
@@ -380,24 +387,80 @@ trait Compiler {
         }
     }
 
+    def updateTree(exp1 : Expression, exp2 : Expression) : Unit = {
+        val substNode =
+            rule[ASTNode] {
+                case m @ Mat(_, _, _, _) if m == exp1 => exp2
+            }
+        program = rewriteTree(oncetd(substNode))(program)
+        semanticAnalyser = new SemanticAnalyser(program)
+    }
+
     def substVar(exp : Expression, oldVar : String, newVar : String) : Expression = {
         val prog = Program(exp)
-        val semanticAnalyser = new SemanticAnalyser(new Tree(prog))
+        val sa = new SemanticAnalyser(new Tree(prog))
         val substIdn =
             rule[ASTNode] {
-                case Idn(i @ IdnUse(`oldVar`)) if semanticAnalyser.entity(i) == UnknownEntity() => Idn(IdnUse(newVar))
+                case Idn(i @ IdnUse(`oldVar`)) if sa.entity(i) == UnknownEntity() => Idn(IdnUse(newVar))
             }
-        rewrite(everywhere(substIdn))(prog) match {
+        val result = rewrite(everywhere(substIdn))(prog)
+
+        val substNode =
+            rule[ASTNode] {
+                case node if node == exp => result.expression
+            }
+
+        program = rewriteTree(oncetd(substNode))(program)
+        semanticAnalyser = new SemanticAnalyser(program)
+
+        result.expression
+    }
+
+    def substExp(exp : Expression, pattern : String, discriminant : Expression) : Expression = {
+        val prog = Program(exp)
+        val substPattern =
+            rule[ASTNode] {
+                case SPtrn(IdnDef(`pattern`)) => discriminant
+            }
+        rewrite(everywhere(substPattern))(prog) match {
             case Program(e) => e
         }
     }
 
-    def newRec(exp : Expression, cons : Vector[String]) : Expression = {
-        Rec(cons.map(c => Field(c, Sel(exp, FieldUse(c)))))
+    def newRec(exp : Expression, cons : String) : Expression = {
+        semanticAnalyser.tipe(exp) match {
+            case Some(tipe) => tipe match {
+                case RecT(fieldTypes) => {
+                    val labels = fieldTypes.map(fldT => fldT.identifier)
+                    if (labels.exists(l => l == cons)) {
+                        Rec(labels.filterNot(c => c == cons).map(l => Field(l, Sel(exp, FieldUse(l)))))
+                    } else {
+                        exp
+                    }
+                }
+                case UniT() => Rec(Vector())
+                case _      => sys.error(s"$exp not of type record")
+            }
+            case None => sys.error(s"record type for $exp not found in tree")
+        }
     }
 
+    // def inRecType(exp : Expression, cons : Vector[String]) : Boolean = {
+    //     semanticAnalyser.tipe(exp) match {
+    //         case Some(tipe) => tipe match {
+    //             case RecT(fieldTypes) => {
+    //                 val labels = fieldTypes.map(fldT => fldT.identifier)
+    //                 cons.foldLeft(true)((a, b) => labels.exists(c => c == b))
+    //             }
+    //             case UniT() => cons.isEmpty
+    //             case _      => sys.error(s"$exp not of type record")
+    //         }
+    //         case None => sys.error(s"record type for $exp not found in tree")
+    //     }
+    // }
+
     def compileCase_2(e : Expression, es : Vector[Expression],
-        css : Vector[Case], d : Default, kappa : String => Term) : Term = {
+        css : Vector[Case], d : Default, m : Mat, kappa : String => Term) : Term = {
 
         val dk = fresh("k")
 
@@ -406,14 +469,20 @@ trait Compiler {
         val cks = es match {
             case h +: t =>
                 ((SPtrn(IdnDef(vi)), Mat(h, t, css.map {
-                    case Case(SPtrn(IdnDef(idn)) +: t, e) =>
-                        Case(t, substVar(e, idn, vi))
+                    case Case(SPtrn(IdnDef(idn)) +: t, ei) =>
+                        Case(t, substExp(ei, idn, e))
                 }, d)), fresh("k"))
             case _ => css(0) match {
                 case Case(p +: _, expr) =>
                     ((p, expr), fresh("k"))
             }
         }
+
+        updateTree(m, Mat(e, Vector(), Vector(Case(cks match {
+            case ((p, _), _) => Vector(p)
+        }, cks match {
+            case ((_, e), _) => e
+        })), d))
 
         val caseTerms = cks match {
             case (_, k) => Vector(sCaseTerm(k))
@@ -429,7 +498,7 @@ trait Compiler {
     }
 
     def compileCase_3(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, kappa : String => Term) : Term = {
+        d : Default, m : Mat, kappa : String => Term) : Term = {
 
         //stable sort
         //map of constructor type to cases with the first pattern of that type
@@ -458,6 +527,8 @@ trait Compiler {
             }
         }
 
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
+
         val dk = fresh("k")
 
         val cks = newCases.map(c => (c, fresh("k")))
@@ -477,7 +548,7 @@ trait Compiler {
     }
 
     def compileCaseInt(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, kappa : String => Term) : Term = {
+        d : Default, m : Mat, kappa : String => Term) : Term = {
 
         val grouped = css.groupBy {
             case Case(IPtrn(n) +: _, _) => n
@@ -497,6 +568,8 @@ trait Compiler {
             }
         }
 
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
+
         val dk = fresh("k")
 
         val cks = newCases.map(c => (c, fresh("k")))
@@ -515,7 +588,7 @@ trait Compiler {
     }
 
     def compileCaseStr(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, kappa : String => Term) : Term = {
+        d : Default, m : Mat, kappa : String => Term) : Term = {
 
         val grouped = css.groupBy {
             case Case(StrPtrn(str) +: _, _) => str
@@ -535,6 +608,8 @@ trait Compiler {
             }
         }
 
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
+
         val dk = fresh("k")
 
         val cks = newCases.map(c => (c, fresh("k")))
@@ -552,8 +627,16 @@ trait Compiler {
         })
     }
 
+    // def compileCaseRecCons(e : Expression, es : Vector[Expression], css : Vector[Case],
+    //     d : Default, m : Mat, kappa : String => Term) : Term = {
+
+    //     val grouped = css.groupBy {
+    //         case Case(RPtrnCons(rLit, idn) +: _, _) =>  
+    //     }
+    // }
+
     def compileCaseRec(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, kappa : String => Term) : Term = {
+        d : Default, m : Mat, kappa : String => Term) : Term = {
 
         //stable sort
         //map of constructor type to cases with the first pattern of that type
@@ -565,13 +648,13 @@ trait Compiler {
                 case FPtrn(lb, _) => lb
                 case LPtrn(lb)    => lb
             }
-            case Case(RPtrnCons(p, ps, _) +: _, _) => (p match {
-                case FPtrn(lb, _) => lb
-                case LPtrn(lb)    => lb
-            }) +: ps.map {
-                case FPtrn(lb, _) => lb
-                case LPtrn(lb)    => lb
-            }
+            // case Case(RPtrnCons(p, ps, _) +: _, _) => (p match {
+            //     case FPtrn(lb, _) => lb
+            //     case LPtrn(lb)    => lb
+            // }) +: ps.map {
+            //     case FPtrn(lb, _) => lb
+            //     case LPtrn(lb)    => lb
+            // }
             case Case(RPtrnE() +: _, _) => Vector()
         }
 
@@ -583,8 +666,7 @@ trait Compiler {
                 Case(
                     Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(cons))), Vector())),
                     Mat(
-                        //newRec(e, t), 
-                        e, Idn(IdnUse(cons)) +: es,
+                        newRec(e, cons), Idn(IdnUse(cons)) +: es,
                         cs.map {
                             case Case(RPtrnLit(p, ps) +: t, expr) => ps match {
                                 case f +: fs => p match {
@@ -596,16 +678,16 @@ trait Compiler {
                                     case LPtrn(cons)  => Case(RPtrnE() +: SPtrn(IdnDef(cons)) +: t, expr)
                                 }
                             }
-                            case Case(RPtrnCons(p, ps, idn) +: t, expr) => ps match {
-                                case f +: fs => p match {
-                                    case FPtrn(_, sp) => Case(RPtrnCons(f, fs, idn) +: sp +: t, expr)
-                                    case LPtrn(cons)  => Case(RPtrnCons(f, fs, idn) +: SPtrn(IdnDef(cons)) +: t, expr)
-                                }
-                                case _ => p match {
-                                    case FPtrn(_, sp) => Case(SPtrn(idn) +: sp +: t, expr)
-                                    case LPtrn(cons)  => Case(SPtrn(idn) +: SPtrn(IdnDef(cons)) +: t, expr)
-                                }
-                            }
+                            // case Case(RPtrnCons(p, ps, idn) +: t, expr) => ps match {
+                            //     case f +: fs => p match {
+                            //         case FPtrn(_, sp) => Case(RPtrnCons(f, fs, idn) +: sp +: t, expr)
+                            //         case LPtrn(cons)  => Case(RPtrnCons(f, fs, idn) +: SPtrn(IdnDef(cons)) +: t, expr)
+                            //     }
+                            //     case _ => p match {
+                            //         case FPtrn(_, sp) => Case(SPtrn(idn) +: sp +: t, expr)
+                            //         case LPtrn(cons)  => Case(SPtrn(idn) +: SPtrn(IdnDef(cons)) +: t, expr)
+                            //     }
+                            // }
                         },
                         d
                     )
@@ -628,6 +710,8 @@ trait Compiler {
                 }
             }
         }
+
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
 
         val dk = fresh("k")
 
@@ -685,15 +769,16 @@ trait Compiler {
         //determining to compile with case2 or case3
         css match {
             case Case(SPtrn(_) +: _, _) +: _ =>
-                compileCase_2(e, es, css, nd, kappa)
+                compileCase_2(e, es, css, nd, Mat(e, es, cs, d), kappa)
             case Case(VPtrn(_, _) +: _, _) +: _ =>
-                compileCase_3(e, es, css, nd, kappa)
-            case Case(r @ (RPtrnLit(_, _) | RPtrnCons(_, _, _) | RPtrnE()) +: _, _) +: _ =>
-                compileCaseRec(e, es, css, nd, kappa)
+                compileCase_3(e, es, css, nd, Mat(e, es, cs, d), kappa)
+            //case Case(r @ (RPtrnLit(_, _) | RPtrnCons(_, _, _) | RPtrnE()) +: _, _) +: _ =>
+            case Case(r @ (RPtrnLit(_, _) | RPtrnE()) +: _, _) +: _ =>
+                compileCaseRec(e, es, css, nd, Mat(e, es, cs, d), kappa)
             case Case(IPtrn(_) +: _, _) +: _ =>
-                compileCaseInt(e, es, css, nd, kappa)
+                compileCaseInt(e, es, css, nd, Mat(e, es, cs, d), kappa)
             case Case(StrPtrn(_) +: _, _) +: _ =>
-                compileCaseStr(e, es, css, nd, kappa)
+                compileCaseStr(e, es, css, nd, Mat(e, es, cs, d), kappa)
         }
     }
 
@@ -859,7 +944,7 @@ trait Compiler {
         }
 
     def tailCompileCase_2(e : Expression, es : Vector[Expression],
-        css : Vector[Case], d : Default, k : String) : Term = {
+        css : Vector[Case], d : Default, m : Mat, k : String) : Term = {
 
         val dk = fresh("k")
 
@@ -877,6 +962,12 @@ trait Compiler {
             }
         }
 
+        updateTree(m, Mat(e, Vector(), Vector(Case(cks match {
+            case ((p, _), _) => Vector(p)
+        }, cks match {
+            case ((_, e), _) => e
+        })), d))
+
         val caseTerms = cks match {
             case (_, k) => Vector(sCaseTerm(k))
         }
@@ -891,7 +982,7 @@ trait Compiler {
     }
 
     def tailCompileCase_3(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, k : String) : Term = {
+        d : Default, m : Mat, k : String) : Term = {
 
         //stable sort
         //map of constructor type to cases with the first pattern of that type
@@ -920,6 +1011,8 @@ trait Compiler {
             }
         }
 
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
+
         val dk = fresh("k")
 
         val cks = newCases.map(c => (c, fresh("k")))
@@ -939,8 +1032,7 @@ trait Compiler {
     }
 
     def tailCompileCaseRec(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, k : String) : Term = {
-
+        d : Default, m : Mat, k : String) : Term = {
         //stable sort
         //map of constructor type to cases with the first pattern of that type
         val grouped = css.groupBy {
@@ -951,13 +1043,13 @@ trait Compiler {
                 case FPtrn(lb, _) => lb
                 case LPtrn(lb)    => lb
             }
-            case Case(RPtrnCons(p, ps, _) +: _, _) => (p match {
-                case FPtrn(lb, _) => lb
-                case LPtrn(lb)    => lb
-            }) +: ps.map {
-                case FPtrn(lb, _) => lb
-                case LPtrn(lb)    => lb
-            }
+            // case Case(RPtrnCons(p, ps, _) +: _, _) => (p match {
+            //     case FPtrn(lb, _) => lb
+            //     case LPtrn(lb)    => lb
+            // }) +: ps.map {
+            //     case FPtrn(lb, _) => lb
+            //     case LPtrn(lb)    => lb
+            // }
             case Case(RPtrnE() +: _, _) => Vector()
         }
 
@@ -969,7 +1061,7 @@ trait Compiler {
                 Case(
                     Vector(RPtrnLit(FPtrn(cons, SPtrn(IdnDef(cons))), Vector())),
                     Mat(
-                        newRec(e, t), Idn(IdnUse(cons)) +: es,
+                        newRec(e, cons), Idn(IdnUse(cons)) +: es,
                         cs.map {
                             case Case(RPtrnLit(p, ps) +: t, expr) => ps match {
                                 case f +: fs => p match {
@@ -981,16 +1073,16 @@ trait Compiler {
                                     case LPtrn(cons)  => Case(RPtrnE() +: SPtrn(IdnDef(cons)) +: t, expr)
                                 }
                             }
-                            case Case(RPtrnCons(p, ps, idn) +: t, expr) => ps match {
-                                case f +: fs => p match {
-                                    case FPtrn(_, sp) => Case(RPtrnCons(f, fs, idn) +: sp +: t, expr)
-                                    case LPtrn(cons)  => Case(RPtrnCons(f, fs, idn) +: SPtrn(IdnDef(cons)) +: t, expr)
-                                }
-                                case _ => p match {
-                                    case FPtrn(_, sp) => Case(SPtrn(idn) +: sp +: t, expr)
-                                    case LPtrn(cons)  => Case(SPtrn(idn) +: SPtrn(IdnDef(cons)) +: t, expr)
-                                }
-                            }
+                            // case Case(RPtrnCons(p, ps, idn) +: t, expr) => ps match {
+                            //     case f +: fs => p match {
+                            //         case FPtrn(_, sp) => Case(RPtrnCons(f, fs, idn) +: sp +: t, expr)
+                            //         case LPtrn(cons)  => Case(RPtrnCons(f, fs, idn) +: SPtrn(IdnDef(cons)) +: t, expr)
+                            //     }
+                            //     case _ => p match {
+                            //         case FPtrn(_, sp) => Case(SPtrn(idn) +: sp +: t, expr)
+                            //         case LPtrn(cons)  => Case(SPtrn(idn) +: SPtrn(IdnDef(cons)) +: t, expr)
+                            //     }
+                            // }
                         },
                         d
                     )
@@ -1014,6 +1106,8 @@ trait Compiler {
             }
         }
 
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
+
         val dk = fresh("k")
 
         val cks = newCases.map(c => (c, fresh("k")))
@@ -1036,7 +1130,7 @@ trait Compiler {
     }
 
     def tailCompileCaseInt(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, k : String) : Term = {
+        d : Default, m : Mat, k : String) : Term = {
 
         val grouped = css.groupBy {
             case Case(IPtrn(n) +: _, _) => n
@@ -1056,6 +1150,8 @@ trait Compiler {
             }
         }
 
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
+
         val dk = fresh("k")
 
         val cks = newCases.map(c => (c, fresh("k")))
@@ -1074,7 +1170,7 @@ trait Compiler {
     }
 
     def tailCompileCaseStr(e : Expression, es : Vector[Expression], css : Vector[Case],
-        d : Default, k : String) : Term = {
+        d : Default, m : Mat, k : String) : Term = {
 
         val grouped = css.groupBy {
             case Case(StrPtrn(str) +: _, _) => str
@@ -1093,6 +1189,8 @@ trait Compiler {
                 case _ => cs(0)
             }
         }
+
+        updateTree(m, Mat(e, Vector(), newCases.toVector, d))
 
         val dk = fresh("k")
 
@@ -1146,15 +1244,16 @@ trait Compiler {
         //determining to compile with case2 or case3
         css match {
             case Case(SPtrn(_) +: _, _) +: _ =>
-                tailCompileCase_2(e, es, css, nd, k)
+                tailCompileCase_2(e, es, css, nd, Mat(e, es, cs, d), k)
             case Case(VPtrn(_, _) +: _, _) +: _ =>
-                tailCompileCase_3(e, es, css, nd, k)
-            case Case(r @ (RPtrnLit(_, _) | RPtrnCons(_, _, _) | RPtrnE()) +: _, _) +: _ =>
-                tailCompileCaseRec(e, es, css, nd, k)
+                tailCompileCase_3(e, es, css, nd, Mat(e, es, cs, d), k)
+            //case Case(r @ (RPtrnLit(_, _) | RPtrnCons(_, _, _) | RPtrnE()) +: _, _) +: _ =>
+            case Case(r @ (RPtrnLit(_, _) | RPtrnE()) +: _, _) +: _ =>
+                tailCompileCaseRec(e, es, css, nd, Mat(e, es, cs, d), k)
             case Case(IPtrn(_) +: _, _) +: _ =>
-                tailCompileCaseInt(e, es, css, nd, k)
+                tailCompileCaseInt(e, es, css, nd, Mat(e, es, cs, d), k)
             case Case(StrPtrn(_) +: _, _) +: _ =>
-                tailCompileCaseStr(e, es, css, nd, k)
+                tailCompileCaseStr(e, es, css, nd, Mat(e, es, cs, d), k)
         }
     }
 
