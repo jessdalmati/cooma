@@ -42,12 +42,15 @@ class ReferenceBackend(
     sealed abstract class Term
     case class AppC(k : String, x : String) extends Term
     case class AppF(f : String, k : String, x : String) extends Term
-    case class CasV(x : String, ks : Vector[CaseTerm]) extends Term
+    case class CasV(x : String, ks : Vector[CaseTerm], d : String) extends Term
     case class LetC(k : String, x : String, t : Term, body : Term) extends Term
     case class LetF(ds : Vector[DefTerm], body : Term) extends Term
     case class LetV(x : String, v : Value, body : Term) extends Term
 
-    case class CaseTerm(c : String, k : String)
+    sealed abstract class CaseTerm
+    case class VCaseTerm(c : String, k : String) extends CaseTerm
+    case class SCaseTerm(k : String) extends CaseTerm
+
     case class DefTerm(f : String, k : String, x : String, body : Term)
 
     override type OutputValueR = ValueR
@@ -60,8 +63,8 @@ class ReferenceBackend(
     def appF(f : String, k : String, x : String) : Term =
         AppF(f, k, x)
 
-    def casV(x : String, cs : Vector[CaseTerm]) : Term =
-        CasV(x, cs)
+    def casV(x : String, cs : Vector[CaseTerm], d : String) : Term =
+        CasV(x, cs, d)
 
     def letC(k : String, x : String, t : Term, body : Term) : Term =
         LetC(k, x, t, body)
@@ -74,8 +77,11 @@ class ReferenceBackend(
     def letV(x : String, v : Value, body : Term) : Term =
         LetV(x, v, body)
 
-    def caseTerm(c : String, k : String) : CaseTerm =
-        CaseTerm(c, k)
+    def vCaseTerm(c : String, k : String) : CaseTerm =
+        VCaseTerm(c, k)
+
+    def sCaseTerm(k : String) : CaseTerm =
+        SCaseTerm(k)
 
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         DefTerm(f, k, x, body)
@@ -217,8 +223,8 @@ class ReferenceBackend(
                 k <+> x
             case AppF(f, k, x) =>
                 f <+> k <+> x
-            case CasV(x, ks) =>
-                "case" <+> value(x) <+> ssep(ks.map(toDocCaseTerm), space)
+            case CasV(x, ks, d) =>
+                "case" <+> value(x) <+> ssep(ks.map(toDocCaseTerm), space) <+> value(d)
             case LetC(k, x, t, body) =>
                 "letc" <+> value(k) <+> value(x) <+> "=" <+> align(toDocTerm(t)) <@>
                     toDocTerm(body)
@@ -231,7 +237,10 @@ class ReferenceBackend(
         }
 
     def toDocCaseTerm(caseTerm : CaseTerm) : Doc =
-        '(' <> value(caseTerm.c) <+> value(caseTerm.k) <> ')'
+        caseTerm match {
+            case VCaseTerm(c, k) => '(' <> value(c) <+> value(k) <> ')'
+            case SCaseTerm(k)    => '(' <> value(k) <> ')'
+        }
 
     def toDocDefTerm(defTerm : DefTerm) : Doc =
         line <> value(defTerm.f) <+> value(defTerm.k) <+> value(defTerm.x) <+>

@@ -28,7 +28,7 @@ class TruffleBackend(config : Config) extends Backend {
 
     type CaseTerm = CoomaCaseTerm
 
-    def casV(x : String, cs : Vector[CaseTerm]) : CoomaTermNode =
+    def casV(x : String, cs : Vector[CaseTerm], d : String) : CoomaTermNode =
         new CoomaCasVTermNode(x, cs.toArray)
 
     def letC(k : String, x : String, t : Term, body : Term) : CoomaTermNode =
@@ -44,6 +44,12 @@ class TruffleBackend(config : Config) extends Backend {
 
     def caseTerm(c : String, k : String) : CaseTerm =
         new CoomaCaseTerm(c, k)
+
+    def vCaseTerm(c : String, k : String) : CaseTerm =
+        new CoomaCaseTerm(c, k)
+
+    def sCaseTerm(k : String) : CaseTerm =
+        new CoomaCaseTerm("", k)
 
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         new CoomaDefTerm(f, k, x, body)

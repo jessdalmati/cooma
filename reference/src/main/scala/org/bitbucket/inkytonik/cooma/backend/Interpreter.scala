@@ -95,13 +95,13 @@ class Interpreter(config : Config) {
                             sys.error(s"interpret AppF: $f is $v")
                     }
 
-                case CasV(x, cs) =>
+                case CasV(x, cs, d) =>
                     lookupR(rho, x) match {
                         case VarR(c1, v) =>
                             val optK =
                                 cs.collectFirst {
-                                    case CaseTerm(c2, k) if c1 == c2 =>
-                                        k
+                                    case VCaseTerm(c2, k) if c1 == c2 => k
+                                    case SCaseTerm(k)                 => k
                                 }
                             optK match {
                                 case Some(k) =>
@@ -114,11 +114,43 @@ class Interpreter(config : Config) {
                                     }
 
                                 case None =>
-                                    sys.error(s"interpret CasV: can't find case for variant $c1")
+                                    lookupC(rho, d) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $d is $v")
+                                    }
                             }
 
                         case err : ErrR =>
                             err
+
+                        case v @ (RecR(_) | IntR(_) | StrR(_)) =>
+                            val optK =
+                                cs.collectFirst {
+                                    case VCaseTerm(_, k) => k
+                                    case SCaseTerm(k)    => k
+                                }
+                            optK match {
+                                case Some(k) =>
+                                    lookupC(rho, k) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $k is $v")
+                                    }
+
+                                case None =>
+                                    lookupC(rho, d) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $d is $v")
+                                    }
+                            }
 
                         case v =>
                             sys.error(s"interpret CasV: $x is $v")
