@@ -58,12 +58,23 @@ Case =
   \n "case" Pattern ++ ',' '=>' nestnl(Expression).
 
 Pattern = 
-    Identifier '(' Pattern ")" {VPtrn}  
-  | IdnDef                     {SPtrn}.
+    '{' FieldPattern (',' FieldPattern)* "}" '&' IdnDef {RecCon}
+  | '{' FieldPattern (',' FieldPattern)* "}"            {RecLit}
+  | Identifier '(' Pattern ")"                          {VPtrn}  
+  | IdnDef                                              {SPtrn}
+  | IntLit                                              {IntCons, 1: BigInt.apply : BigInt}
+  | '"' SPLit '"'                                       {StrCons}.
+
+FieldPattern = 
+    Identifier '=' Pattern  {FPtrn}
+  | Identifier              {LPtrn}.
 
 Default = 
     \n "case" "$" '=>' nestnl(Expression) {Dflt}
   |                                       {NoDflt}.
+
+SPLit : Token = 
+  StringChar*.
 
 Field =
   \n Identifier sp "=" Expression.

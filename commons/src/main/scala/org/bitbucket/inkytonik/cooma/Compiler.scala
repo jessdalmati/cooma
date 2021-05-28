@@ -9,6 +9,8 @@ trait Compiler {
     import org.bitbucket.inkytonik.cooma.Primitives._
     import org.bitbucket.inkytonik.cooma.Util.{fresh, resetFresh, unescape}
     import org.bitbucket.inkytonik.kiama.rewriting.Rewriter._
+    import org.bitbucket.inkytonik.kiama.relation._
+    import org.bitbucket.inkytonik.cooma.SymbolTable._
 
     /**
      * Compile a program that will run as a command with
@@ -396,30 +398,94 @@ trait Compiler {
     //         })
     // }
 
+    def getPrefix(cs : Vector[Case]) : Vector[Case] = {
+        val lead = cs(0).patterns(0)
+
+        lead match {
+            case RecCon(f1, _, _) =>
+                cs.takeWhile {
+                    case Case(RecCon(f2, flds, _) +: _, _) =>
+                        (f2 +: flds).map {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        }.contains(f1 match {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        })
+                    case _ => false
+                }
+            case RecLit(f1, _) =>
+                cs.takeWhile {
+                    case Case(RecLit(f2, flds) +: _, _) =>
+                        (f2 +: flds).map {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        }.contains(f1 match {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        })
+                    case _ => false
+                }
+            case SPtrn(_) =>
+                cs.takeWhile {
+                    case Case(SPtrn(_) +: _, _) => true
+                    case _                      => false
+                }
+            case _ =>
+                cs.takeWhile {
+                    case Case(SPtrn(_) +: _, _) => false
+                    case _                      => true
+                }
+        }
+    }
+
+    def getSuffix(cs : Vector[Case]) : Vector[Case] = {
+        val lead = cs(0).patterns(0)
+
+        lead match {
+            case RecCon(f1, _, _) =>
+                cs.dropWhile {
+                    case Case(RecCon(f2, flds, _) +: _, _) =>
+                        (f2 +: flds).map {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        }.contains(f1 match {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        })
+                    case _ => false
+                }
+            case RecLit(f1, _) =>
+                cs.dropWhile {
+                    case Case(RecLit(f2, flds) +: _, _) =>
+                        (f2 +: flds).map {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        }.contains(f1 match {
+                            case FPtrn(l, _) => l
+                            case LPtrn(l)    => l
+                        })
+                    case _ => false
+                }
+            case SPtrn(_) =>
+                cs.dropWhile {
+                    case Case(SPtrn(_) +: _, _) => true
+                    case _                      => false
+                }
+            case _ =>
+                cs.dropWhile {
+                    case Case(SPtrn(_) +: _, _) => false
+                    case _                      => true
+                }
+        }
+    }
+
     def compileMatch(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
         //cases before the split
-        val css = cs match {
-            case Case(SPtrn(_) +: t, _) +: tail => cs.takeWhile {
-                case Case(SPtrn(_) +: t, _) => true
-                case _                      => false
-            }
-            case _ => cs.takeWhile {
-                case Case(SPtrn(_) +: t, _) => false
-                case _                      => true
-            }
-        }
+        val css = getPrefix(cs)
 
         //rest of the cases after the split
-        val rest = css match {
-            case Case(SPtrn(_) +: t, _) +: tail => cs.dropWhile {
-                case Case(SPtrn(_) +: t, _) => true
-                case _                      => false
-            }
-            case _ => cs.dropWhile {
-                case Case(SPtrn(_) +: t, _) => false
-                case _                      => true
-            }
-        }
+        val rest = getSuffix(cs)
 
         //default with the rest of the cases
         val nd = rest match {
@@ -428,20 +494,206 @@ trait Compiler {
         }
 
         css match {
-            case Case(SPtrn(_) +: _, _) +: _ => compileMatchCase_2(e, es, css, nd, kappa)
-            case _                           => compileMatchCase_3(e, es, css, nd, kappa)
+            case Case(SPtrn(_) +: _, _) +: _ =>
+                compileMatchCase_2(e, es, css, nd, kappa)
+            case Case(VPtrn(_, _) +: _, _) +: _ =>
+                compileMatchCase_3(e, es, css, nd, kappa)
+            case Case(IntCons(_) +: _, _) +: _ =>
+                compileIntCons(e, es, css, nd, kappa)
+            case Case(StrCons(_) +: _, _) +: _ =>
+                compileStrCons(e, es, css, nd, kappa)
+            case Case((RecCon(_, _, _) | RecLit(_, _)) +: _, _) +: _ =>
+                compileRecPtrn(e, es, css, nd, kappa)
         }
     }
 
-    def substExp(e : Expression, v : String, E : Expression) : Expression = {
-        val prog = Program(E)
-        val substVar =
-            rule[ASTNode] {
-                case SPtrn(IdnDef(`v`)) => e
+    def compileRecPtrn(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
+        //determine if all literals
+        val isMixed = cs.exists(c => c match {
+            case Case(RecCon(_, _, _) +: _, _) => true
+            case _                             => false
+        })
+
+        isMixed match {
+            case true => //make all concat patterns and compile as per rec mixed case
+                val css = cs.map(c => c match {
+                    case Case(RecLit(f, fs) +: ptrns, exp) => Case(RecCon(f, fs, IdnDef(fresh("r"))) +: ptrns, exp)
+                    case cse                               => cse
+                })
+                compileCaseRecCon(e, es, css, d, kappa)
+            case false => //compile as all lit
+                compileCaseRecLit(e, es, cs, d, kappa)
+        }
+    }
+
+    def compileCaseRecLit(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
+        val labels = cs(0).patterns(0) match {
+            case RecLit(f, fs) => (f +: fs).map {
+                case FPtrn(l, _) => l
+                case LPtrn(l)    => l
             }
-        rewrite(everywhere(substVar))(prog) match {
+            case _ => Vector()
+        }
+
+        val ess = labels.map(l => Sel(e, FieldUse(l))) ++ es
+
+        val css = cs.map {
+            case Case(RecLit(f, fs) +: ptrns, expr) =>
+                Case((f +: fs).map {
+                    case FPtrn(l, sp) => sp
+                    case LPtrn(l)     => SPtrn(IdnDef(l))
+                } ++ ptrns, labels.foldLeft(expr) {
+                    case (exp, l) => substExp(Sel(e, FieldUse(l)), l, exp)
+                })
+            case c => c
+        }
+
+        ess match {
+            case e +: es => compileMatch(e, es, css, d, kappa)
+            case _       => compileMatchErr()
+        }
+    }
+
+    def compileCaseRecCon(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
+        val label = cs(0).patterns(0) match {
+            case RecCon(f, _, _) => f match {
+                case FPtrn(l, _) => l
+                case LPtrn(l)    => l
+            }
+            case _ => ""
+        }
+
+        val ess = Sel(e, FieldUse(label)) +: subtractRec(e, label) +: es
+
+        val css = cs.map {
+            case Case(RecCon(f, fs, v) +: ptrns, expr) => {
+                val newFields = (f +: fs).filterNot {
+                    case FPtrn(`label`, _) => true
+                    case LPtrn(`label`)    => true
+                    case _                 => false
+                }
+                val subPtrn = (f +: fs).find {
+                    case FPtrn(`label`, _) => true
+                    case LPtrn(`label`)    => true
+                    case _                 => false
+                } match {
+                    case Some(fieldPtrn) => fieldPtrn match {
+                        case FPtrn(l, sp) => sp
+                        case LPtrn(l)     => SPtrn(IdnDef(l))
+                    }
+                    case None => sys.error(s"label $label not found in record pattern")
+                }
+                newFields match {
+                    case hd +: tl => Case(subPtrn +: RecCon(hd, tl, v) +: ptrns, substExp(Sel(e, FieldUse(label)), label, expr))
+                    case _        => Case(Vector(subPtrn, SPtrn(v)), substExp(Sel(e, FieldUse(label)), label, expr))
+                }
+            }
+        }
+
+        ess match {
+            case e +: es => compileMatch(e, es, css, d, kappa)
+            case _       => compileMatchErr()
+        }
+    }
+
+    def subtractRec(r : Expression, l : String) : Expression = {
+        r match {
+            case Rec(fs) =>
+                val newFields = fs.filterNot(f => f.identifier == l)
+                newFields match {
+                    case hd +: tl => Rec(newFields)
+                    case _        => Uni()
+                }
+            case _ => r
+        }
+    }
+
+    def substExp(e : Expression, idn : String, E : Expression) : Expression = {
+        val prog = Program(E)
+        val semanticAnalyser = new SemanticAnalyser(new Tree(prog))
+        val substIdn =
+            rule[ASTNode] {
+                case Idn(i @ IdnUse(`idn`)) if semanticAnalyser.entity(i) == UnknownEntity() => e
+            }
+        rewrite(everywhere(substIdn))(prog) match {
             case Program(e) => e
         }
+    }
+
+    def compileIntCons(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
+        val grouped = cs.groupBy {
+            case Case(IntCons(i) +: _, _) => i
+        }
+
+        val newCases = grouped.map {
+            case (cons, cs) => es match {
+                case h +: t =>
+                    Case(
+                        Vector(IntCons(cons)),
+                        Mat(h, t, cs.map {
+                            case Case(IntCons(_) +: t, expr) =>
+                                Case(t, expr)
+                        }, d)
+                    )
+                case _ => cs(0)
+            }
+        }
+
+        val dk = fresh("k")
+
+        val cks = newCases.map(c => (c, fresh("k")))
+
+        val caseTerms = cks.map {
+            case (Case(IntCons(i) +: _, _), k) => intCaseTerm(i, k)
+        }.toVector
+
+        val nd = d match {
+            case Dflt(d)  => compile(d, zi => kappa(zi))
+            case NoDflt() => compileMatchErr()
+        }
+
+        compile(e, z => cks.foldLeft(letC(dk, z, nd, casV(z, caseTerms, dk))) {
+            case (t, (Case(IntCons(_) +: _, ei), ki)) =>
+                letC(ki, fresh("v"), compile(ei, zi => kappa(zi)), t)
+        })
+    }
+
+    def compileStrCons(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
+        val grouped = cs.groupBy {
+            case Case(StrCons(s) +: _, _) => s
+        }
+
+        val newCases = grouped.map {
+            case (cons, cs) => es match {
+                case h +: t =>
+                    Case(
+                        Vector(StrCons(cons)),
+                        Mat(h, t, cs.map {
+                            case Case(StrCons(_) +: t, expr) =>
+                                Case(t, expr)
+                        }, d)
+                    )
+                case _ => cs(0)
+            }
+        }
+
+        val dk = fresh("k")
+
+        val cks = newCases.map(c => (c, fresh("k")))
+
+        val caseTerms = cks.map {
+            case (Case(StrCons(s) +: _, _), k) => strCaseTerm(s, k)
+        }.toVector
+
+        val nd = d match {
+            case Dflt(d)  => compile(d, zi => kappa(zi))
+            case NoDflt() => compileMatchErr()
+        }
+
+        compile(e, z => cks.foldLeft(letC(dk, z, nd, casV(z, caseTerms, dk))) {
+            case (t, (Case(StrCons(_) +: _, ei), ki)) =>
+                letC(ki, fresh("v"), compile(ei, zi => kappa(zi)), t)
+        })
     }
 
     def compileMatchCase_2(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, kappa : String => Term) : Term = {
@@ -719,9 +971,87 @@ trait Compiler {
         }
 
         css match {
-            case Case(SPtrn(_) +: _, _) +: _ => tailCompileMatchCase_2(e, es, css, nd, k)
-            case _                           => tailCompileMatchCase_3(e, es, css, nd, k)
+            case Case(SPtrn(_) +: _, _) +: _    => tailCompileMatchCase_2(e, es, css, nd, k)
+            case Case(VPtrn(_, _) +: _, _) +: _ => tailCompileMatchCase_3(e, es, css, nd, k)
+            case Case(IntCons(_) +: _, _) +: _  => tailCompileIntCons(e, es, css, nd, k)
+            case Case(StrCons(_) +: _, _) +: _  => tailCompileStrCons(e, es, css, nd, k)
         }
+    }
+
+    def tailCompileIntCons(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, k : String) : Term = {
+        val grouped = cs.groupBy {
+            case Case(IntCons(i) +: _, _) => i
+        }
+
+        val newCases = grouped.map {
+            case (cons, cs) => es match {
+                case h +: t =>
+                    Case(
+                        Vector(IntCons(cons)),
+                        Mat(h, t, cs.map {
+                            case Case(IntCons(_) +: t, expr) =>
+                                Case(t, expr)
+                        }, d)
+                    )
+                case _ => cs(0)
+            }
+        }
+
+        val dk = fresh("k")
+
+        val cks = newCases.map(c => (c, fresh("k")))
+
+        val caseTerms = cks.map {
+            case (Case(IntCons(i) +: _, _), k) => intCaseTerm(i, k)
+        }.toVector
+
+        val nd = d match {
+            case Dflt(d)  => tailCompile(d, k)
+            case NoDflt() => compileMatchErr()
+        }
+
+        compile(e, z => cks.foldLeft(letC(dk, z, nd, casV(z, caseTerms, dk))) {
+            case (t, (Case(IntCons(_) +: _, ei), ki)) =>
+                letC(ki, fresh("v"), tailCompile(ei, k), t)
+        })
+    }
+
+    def tailCompileStrCons(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, k : String) : Term = {
+        val grouped = cs.groupBy {
+            case Case(StrCons(s) +: _, _) => s
+        }
+
+        val newCases = grouped.map {
+            case (cons, cs) => es match {
+                case h +: t =>
+                    Case(
+                        Vector(StrCons(cons)),
+                        Mat(h, t, cs.map {
+                            case Case(StrCons(_) +: t, expr) =>
+                                Case(t, expr)
+                        }, d)
+                    )
+                case _ => cs(0)
+            }
+        }
+
+        val dk = fresh("k")
+
+        val cks = newCases.map(c => (c, fresh("k")))
+
+        val caseTerms = cks.map {
+            case (Case(StrCons(s) +: _, _), k) => strCaseTerm(s, k)
+        }.toVector
+
+        val nd = d match {
+            case Dflt(d)  => tailCompile(d, k)
+            case NoDflt() => compileMatchErr()
+        }
+
+        compile(e, z => cks.foldLeft(letC(dk, z, nd, casV(z, caseTerms, dk))) {
+            case (t, (Case(StrCons(_) +: _, ei), ki)) =>
+                letC(ki, fresh("v"), tailCompile(ei, k), t)
+        })
     }
 
     def tailCompileMatchCase_2(e : Expression, es : Vector[Expression], cs : Vector[Case], d : Default, k : String) : Term = {

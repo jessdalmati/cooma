@@ -50,6 +50,8 @@ class ReferenceBackend(
     sealed abstract class CaseTerm
     case class VCaseTerm(c : String, k : String) extends CaseTerm
     case class SCaseTerm(k : String) extends CaseTerm
+    case class IntCaseTerm(n : BigInt, k : String) extends CaseTerm
+    case class StrCaseTerm(s : String, k : String) extends CaseTerm
 
     case class DefTerm(f : String, k : String, x : String, body : Term)
 
@@ -82,6 +84,12 @@ class ReferenceBackend(
 
     def sCaseTerm(k : String) : CaseTerm =
         SCaseTerm(k)
+
+    def intCaseTerm(n : BigInt, k : String) : CaseTerm =
+        IntCaseTerm(n, k)
+
+    def strCaseTerm(s : String, k : String) : CaseTerm =
+        StrCaseTerm(s, k)
 
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm =
         DefTerm(f, k, x, body)
@@ -238,8 +246,10 @@ class ReferenceBackend(
 
     def toDocCaseTerm(caseTerm : CaseTerm) : Doc =
         caseTerm match {
-            case VCaseTerm(c, k) => '(' <> value(c) <+> value(k) <> ')'
-            case SCaseTerm(k)    => '(' <> value(k) <> ')'
+            case VCaseTerm(c, k)   => '(' <> value(c) <+> value(k) <> ')'
+            case SCaseTerm(k)      => '(' <> value(k) <> ')'
+            case IntCaseTerm(n, k) => '(' <> value(n) <+> value(k) <> ')'
+            case StrCaseTerm(s, k) => '(' <> value(s) <+> value(k) <> ')'
         }
 
     def toDocDefTerm(defTerm : DefTerm) : Doc =

@@ -102,6 +102,92 @@ class Interpreter(config : Config) {
                                 cs.collectFirst {
                                     case VCaseTerm(c2, k) if c1 == c2 => k
                                     case SCaseTerm(k)                 => k
+                                    case StrCaseTerm(_, k)            => k
+                                    case IntCaseTerm(_, k)            => k
+                                }
+                            optK match {
+                                case Some(k) =>
+                                    lookupC(rho, k) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $k is $v")
+                                    }
+
+                                case None =>
+                                    lookupC(rho, d) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $d is $v")
+                                    }
+                            }
+
+                        case v @ RecR(_) =>
+                            val optK =
+                                cs.collectFirst {
+                                    case VCaseTerm(_, k)   => k
+                                    case SCaseTerm(k)      => k
+                                    case StrCaseTerm(_, k) => k
+                                    case IntCaseTerm(_, k) => k
+                                }
+                            optK match {
+                                case Some(k) =>
+                                    lookupC(rho, k) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $k is $v")
+                                    }
+
+                                case None =>
+                                    lookupC(rho, d) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $d is $v")
+                                    }
+                            }
+
+                        case v @ IntR(n1) =>
+                            val optK =
+                                cs.collectFirst {
+                                    case IntCaseTerm(n2, k) if n1 == n2 => k
+                                    case VCaseTerm(_, k)                => k
+                                    case SCaseTerm(k)                   => k
+                                    case StrCaseTerm(_, k)              => k
+                                }
+                            optK match {
+                                case Some(k) =>
+                                    lookupC(rho, k) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $k is $v")
+                                    }
+
+                                case None =>
+                                    lookupC(rho, d) match {
+                                        case ClsC(rho2, y, t) =>
+                                            interpretAux(ConsVE(rho2, y, v), t)
+
+                                        case v =>
+                                            sys.error(s"interpret CasV: $d is $v")
+                                    }
+                            }
+
+                        case v @ StrR(s1) =>
+                            val optK =
+                                cs.collectFirst {
+                                    case StrCaseTerm(s2, k) if s1 == s2 => k
+                                    case VCaseTerm(_, k)                => k
+                                    case SCaseTerm(k)                   => k
+                                    case IntCaseTerm(_, k)              => k
                                 }
                             optK match {
                                 case Some(k) =>
@@ -125,32 +211,6 @@ class Interpreter(config : Config) {
 
                         case err : ErrR =>
                             err
-
-                        case v @ (RecR(_) | IntR(_) | StrR(_)) =>
-                            val optK =
-                                cs.collectFirst {
-                                    case VCaseTerm(_, k) => k
-                                    case SCaseTerm(k)    => k
-                                }
-                            optK match {
-                                case Some(k) =>
-                                    lookupC(rho, k) match {
-                                        case ClsC(rho2, y, t) =>
-                                            interpretAux(ConsVE(rho2, y, v), t)
-
-                                        case v =>
-                                            sys.error(s"interpret CasV: $k is $v")
-                                    }
-
-                                case None =>
-                                    lookupC(rho, d) match {
-                                        case ClsC(rho2, y, t) =>
-                                            interpretAux(ConsVE(rho2, y, v), t)
-
-                                        case v =>
-                                            sys.error(s"interpret CasV: $d is $v")
-                                    }
-                            }
 
                         case v =>
                             sys.error(s"interpret CasV: $x is $v")

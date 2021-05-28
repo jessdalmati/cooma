@@ -13,6 +13,8 @@ trait Backend {
     type CaseTerm
     def vCaseTerm(c : String, k : String) : CaseTerm
     def sCaseTerm(k : String) : CaseTerm
+    def intCaseTerm(n : BigInt, k : String) : CaseTerm
+    def strCaseTerm(s : String, k : String) : CaseTerm
 
     type DefTerm
     def defTerm(f : String, k : String, x : String, body : Term) : DefTerm
